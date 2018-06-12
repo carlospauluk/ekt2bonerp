@@ -1,0 +1,31 @@
+/*
+To change this license header, choose License Headers in Project Properties.
+To change this template file, choose Tools | Templates
+and open the template in the editor.
+*/
+/* 
+    Created on : 02/09/2017, 12:34:33
+    Author     : Carlos
+*/
+
+
+input, select {
+    text-transform: uppercase;
+}
+
+input[type=submit], input[type=button]  {
+    text-transform: none;
+}
+
+.crsr-dec2,
+.crsr-dec3,
+.crsr-money
+{
+    text-align: right;
+    text-transform: none;
+}
+
+
+.table-hover tbody tr:hover {
+    background-color: lightcoral;
+}
