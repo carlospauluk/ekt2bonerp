@@ -8,12 +8,28 @@ class ImportarEkt2Espelhos extends CI_Controller
 
     private $agora;
 
+    /**
+     * Qual a pasta dos CSVs. Será obtido a partir da variável de ambiente EKT_CSVS_PATH.
+     * @var string
+     */
     private $csvsPath;
 
+    /**
+     * Qual a pasta do log. Será obtido a partir da variável de ambiente EKT_LOG_PATH.
+     * @var string
+     */
     private $logPath;
 
+    /**
+     * Passado pela linha de comando no formato YYYYMM.
+     * @var string
+     */
     private $mesAno;
 
+    /**
+     * $mesAno convertido para DateTime.
+     * @var DateTime
+     */
     private $dtMesAno;
 
     public function __construct()
@@ -34,6 +50,14 @@ class ImportarEkt2Espelhos extends CI_Controller
      *
      * $mesano (deve ser passado no formato YYYYMM).
      * $importadores (GERAIS,FOR,PROD,PED,VEN,ENC).
+     * 
+     * Pela linha de comando, chamar com:
+     * 
+     * export EKT_CSVS_PATH=/mnt/10.1.1.100-export/
+     * export EKT_LOG_PATH=~/dev/github/ekt2bonerp/log/
+     * 
+     * 
+     * php index.php jobs/ekt/ImportarEkt2Espelhos importar YYYYMM FOR-PROD-...
      */
     public function importar($mesano, $importadores)
     {
@@ -53,6 +77,9 @@ class ImportarEkt2Espelhos extends CI_Controller
         
         $this->mesAno = $mesano;
         $this->dtMesAno = DateTime::createFromFormat('Ymd', $mesano . "01");
+        if (! $this->dtMesAno instanceof DateTime) {
+            die("mesano inválido.\n\n\n");
+        }
         
         $tiposImportacoes = explode("-", $importadores);
         
