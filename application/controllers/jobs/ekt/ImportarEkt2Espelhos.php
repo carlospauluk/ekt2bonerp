@@ -1,20 +1,20 @@
 <?php
 
 /**
- * Job que realiza a importação dos fornecedores a partir da tabela ekt_fornecedor.
+ * Job que realiza a importação dos dados nos CSVs gerados pelo EKT para as tabelas espelho (ekt_*).
  */
 class ImportarEkt2Espelhos extends CI_Controller
 {
 
     private $agora;
 
-    private $dirLogs;
+    private $csvsPath;
 
-    private $logFile;
+    private $logPath;
 
-    private $MESANOIMPORT;
+    private $mesAno;
 
-    private $path;
+    private $dtMesAno;
 
     public function __construct()
     {
@@ -22,31 +22,39 @@ class ImportarEkt2Espelhos extends CI_Controller
         ini_set('max_execution_time', 0);
         ini_set('memory_limit', '2048M');
         $this->load->database();
+        $this->load->library('datetime_library');
         error_reporting(E_ALL);
         ini_set('display_errors', 1);
         
         $this->agora = new DateTime();
     }
 
-    public function importar($ambiente, $mesano, $args)
+    /**
+     * Método principal
+     *
+     * $mesano (deve ser passado no formato YYYYMM).
+     * $importadores (GERAIS,FOR,PROD,PED,VEN,ENC).
+     */
+    public function importar($mesano, $importadores)
     {
         $time_start = microtime(true);
         
-        echo "Estamos no ambiente: [" . $ambiente . "]" . PHP_EOL;
-        echo "Iniciando a importação para o mês/ano: [" . $mesano . "]" . PHP_EOL;
+        echo PHP_EOL . PHP_EOL;
         
-        $this->dirLogs = $ambiente == "P" ? "/home/ocabit/bonerp/logs/" : "D:/home/ocabit/bonerp/logs/";
-        echo "dirLogs: [" . $this->dirLogs . "]" . PHP_EOL;
+        $this->csvsPath = getenv('EKT_CSVS_PATH') or die("EKT_CSVS_PATH não informado\n\n\n");
+        $this->logPath = getenv('EKT_LOG_PATH') or die("EKT_LOG_PATH não informado\n\n\n");
         
-        $this->logFile = $this->dirLogs . str_replace(" ", "_", $args) . "-" . $this->agora->format('Y-m-d_H-i-s') . ".txt";
+        echo "csvsPath: [" . $this->csvsPath . "]" . PHP_EOL;
+        echo "logPath: [" . $this->logPath . "]" . PHP_EOL;
+        $this->logFile = $this->logPath . str_replace(" ", "_", $importadores) . "-" . $this->agora->format('Y-m-d_H-i-s') . ".txt";
         echo "logFile: [" . $this->logFile . "]" . PHP_EOL;
         
-        $this->path = $ambiente == "P" ? "/mnt/10.1.1.100-export/" : "\\\\10.1.1.100\\export\\";
-        echo "path: [" . $this->path . "]" . PHP_EOL;
+        echo "Iniciando a importação para o mês/ano: [" . $mesano . "]" . PHP_EOL;
         
-        $this->MESANOIMPORT = DateTime::createFromFormat('Ymd', $mesano . "01");
+        $this->mesAno = $mesano;
+        $this->dtMesAno = DateTime::createFromFormat('Ymd', $mesano . "01");
         
-        $tiposImportacoes = explode("-", $args);
+        $tiposImportacoes = explode("-", $importadores);
         
         foreach ($tiposImportacoes as $tipo) {
             if (! in_array($tipo, array(
@@ -57,13 +65,17 @@ class ImportarEkt2Espelhos extends CI_Controller
                 'VEN',
                 'ENC'
             ))) {
-                die("Tipo de importação inválido: [" . $tipo . "]");
+                echo "Tipo de importação inválido: [" . $tipo . "]";
             }
         }
         
         if (in_array('FOR', $tiposImportacoes)) {
             $this->importarFornecedores();
         }
+        
+        $time_end = microtime(true);
+        $execution_time = ($time_end - $time_start);
+        echo "\n\n\n\n----------------------------------\nTotal Execution Time: " . $execution_time . "s\n\n";
     }
 
     public function importarFornecedores()
@@ -72,7 +84,13 @@ class ImportarEkt2Espelhos extends CI_Controller
         
         echo "FORNECEDORES";
         
-        // deleteByMesAno
+        $this->load->model('ekt/ektfornecedor_model');
+        $model = $this->ektfornecedor_model;
+        
+        if (! $model->delete_by_mesano($this->mesAno)) {
+            log_message('error', 'Erro em deleteByMesAno');
+            return;
+        }
         
         // 1 RECORD_NUMBER 4 INTEGER
         // 2 CODIGO 3 DECIMAL
@@ -104,9 +122,12 @@ class ImportarEkt2Espelhos extends CI_Controller
         
         // loop linhas
         
-        $linhas = file($this->path . "est_d002.csv");
+        $linhas = file($this->csvsPath . "est_d002.csv");
         
         $i = 0;
+        
+        $todos = array();
+        
         foreach ($linhas as $linha) {
             
             $i ++;
@@ -123,7 +144,7 @@ class ImportarEkt2Espelhos extends CI_Controller
             $ektFornecedor['NOME_FANTASIA'] = $campos[3];
             $ektFornecedor['CGC'] = $campos[4];
             $ektFornecedor['INSC'] = $campos[5];
-            $ektFornecedor['DATA_CAD'] = $campos[6]; // tratar date
+            $ektFornecedor['DATA_CAD'] = $this->datetime_library->dateStrToSqlDate($campos[6]);
             $ektFornecedor['ENDERECO'] = $campos[7];
             $ektFornecedor['BAIRRO'] = $campos[8];
             $ektFornecedor['MUNICIPIO'] = $campos[9];
@@ -138,29 +159,38 @@ class ImportarEkt2Espelhos extends CI_Controller
             $ektFornecedor['DDD_REPRES'] = $campos[18];
             $ektFornecedor['FONE_REPRES'] = $campos[19];
             $ektFornecedor['COMPRAS_AC'] = $campos[20]; // double
-            $ektFornecedor['DATA_ULT_COMP'] = $campos[21]; // date
+            $ektFornecedor['DATA_ULT_COMP'] = $this->datetime_library->dateStrToSqlDate($campos[21]);
             $ektFornecedor['PECAS_AC'] = $campos[22]; // double
             $ektFornecedor['TIPO'] = $campos[23];
-            $ektFornecedor['mesano'] = $mesano;
+            $ektFornecedor['mesano'] = $this->mesAno;
             
             $setembro2015 = DateTime::createFromFormat('d/m/Y', '30/09/2015');
             $outubro2015 = DateTime::createFromFormat('d/m/Y', '31/10/2015');
             $dezembro2015 = DateTime::createFromFormat('d/m/Y', '31/12/2015');
             
-            if ($MESANOIMPORT->getTimestamp() > $dezembro2015->getTimestamp()) {
+            if ($this->dtMesAno->getTimestamp() > $dezembro2015->getTimestamp()) {
                 $ektFornecedor['DT_ULTALT'] = $campos[24]; // date
             }
-        
-        $this->handleIudtUserInfo(&$ektFornecedor);
+            
+            $this->handleIudtUserInfo($ektFornecedor);
+            
+            if (! $this->db->insert('ekt_fornecedor', $ektFornecedor)) {
+                log_message('error', 'Erro ao salvar o ektFornecedor');
+                return;
+            }
         }
+        
+        $this->db->trans_complete();
     }
 
-    private function handleIudtUserInfo($obj)
+    private function handleIudtUserInfo(&$entity)
     {
-        $ektFornecedor['inserted'] = new DateTime();
-        $ektFornecedor['updated'] = new DateTime();
-        $ektFornecedor['estabelecimento_id'] = 1;
-        $ektFornecedor['user_inserted_id'] = 1;
-        $ektFornecedor['user_updated_id'] = 1;
+        $entity['inserted'] = $this->agora->format('Y-m-d H:i:s');
+        $entity['updated'] = $this->agora->format('Y-m-d H:i:s');
+        $entity['estabelecimento_id'] = 1;
+        $entity['user_inserted_id'] = 1;
+        $entity['user_updated_id'] = 1;
     }
+    
+    
 }
