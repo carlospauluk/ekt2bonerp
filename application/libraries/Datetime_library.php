@@ -10,7 +10,7 @@ class Datetime_library
         if ($dateTime instanceof DateTime) {
             return $dateTime->format('Y-m-d');
         } else {
-            return $default ? $default : '1900-01-01';
+            return $default !== null ? $default : '1900-01-01';
         }
     }
 
@@ -20,7 +20,7 @@ class Datetime_library
         if ($dateTime instanceof DateTime) {
             return $dateTime->format('Y-m-d H:i:s');
         } else {
-            return $default ? $default : '1900-01-01';
+            return $default !== null ? $default : '1900-01-01';
         }
     }
 }
