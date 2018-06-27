@@ -379,6 +379,8 @@ class ImportarEkt2Espelhos extends CI_Controller
         
         $linhas = file($this->csvsPath . "est_d002.csv");
         
+        echo "Linhas: " . count($linhas) . PHP_EOL . PHP_EOL;
+        
         $i = 0;
         
         $todos = array();
