@@ -18,6 +18,7 @@ class ImportarFornecedores extends CI_Controller
         $this->load->database();
         error_reporting(E_ALL);
         ini_set('display_errors', 1);
+        $this->load->model('est/fornecedor_model');
     }
 
     /**
@@ -87,8 +88,14 @@ class ImportarFornecedores extends CI_Controller
         $time_start = microtime(true);
         $this->db->trans_start();
         
-        // Pega somente o que tem nome_fantasia
-        $sql = "SELECT * FROM ekt_fornecedor WHERE nome_fantasia IS NOT NULL AND trim(nome_fantasia) != '' AND mesano = ? ORDER BY id";
+        $this->mesano = $mesano;
+        $this->dtMesano = DateTime::createFromFormat('Ymd', $mesano . "01");
+        $this->dtMesano->setTime(0, 0, 0, 0);
+        if (! $this->dtMesano instanceof DateTime) {
+            die("mesano inválido.\n\n\n");
+        }
+        
+        $sql = "SELECT * FROM ekt_fornecedor WHERE mesano = ? ORDER BY id";
         $query = $this->db->query($sql, $mesano) or $this->exit_db_error();
         $result = $query->result_array();
         
@@ -97,9 +104,14 @@ class ImportarFornecedores extends CI_Controller
         foreach ($result as $fornecedorEkt) {
             
             $codigoEkt = $fornecedorEkt['CODIGO'];
+            $nomeFantasia = trim($fornecedorEkt['NOME_FANTASIA']);
             
             // Pesquisa nos est_fornecedor pelo mesmo codigo_ekt, somente tipo 'ESTOQUE', e ainda vigentes (ate is NULL)
-            $query = $this->db->query("SELECT * FROM vw_est_fornecedor WHERE codigo_ekt = ? AND tipo = 'ESTOQUE' AND ate IS NULL", $codigoEkt) or $this->exit_db_error();
+            $params = array(
+                $codigoEkt,
+                $nomeFantasia
+            );
+            $query = $this->db->query("SELECT * FROM vw_est_fornecedor WHERE codigo_ekt = ? AND nome_fantasia = ? AND tipo = 'ESTOQUE'", $params) or $this->exit_db_error();
             $r = $query->result_array();
             
             if (count($r) > 1) {
@@ -136,8 +148,10 @@ class ImportarFornecedores extends CI_Controller
     /**
      * Verifica se é o mesmo fornecedor comparando os nomes fantasias.
      *
-     * @param type $fornecedorBonERP
-     * @param type $fornecedorEkt
+     * @param
+     *            $fornecedorBonERP
+     * @param
+     *            $fornecedorEkt
      * @return boolean
      */
     private function checkMesmoNomeFantasia($fornecedorBonERP, $fornecedorEkt)
@@ -157,15 +171,20 @@ class ImportarFornecedores extends CI_Controller
 
     /**
      *
-     * @param type $fornecedorBonERP
-     * @param type $fornecedorEkt
+     * @param
+     *            $fornecedorBonERP
+     * @param
+     *            $fornecedorEkt
      */
     private function salvarFornecedor($fornecedorEkt, $fornecedorBonERP = null)
     {
         $atualizando = false;
         $fornecedorBonERP_id = $fornecedorBonERP['id']; // pego o ID para os casos em que é uma atualização
         $pessoaId = isset($fornecedorBonERP['pessoa_id']) ? $fornecedorBonERP['pessoa_id'] : null;
-        $fornecedorBonERP = array(); // limpo o array pq ele na verdade veio da vw_est_fornecedor, portanto com campos a mais
+        
+        // $fornecedorBonERP = $this-> array(); // limpo o array pq ele na verdade veio da vw_est_fornecedor, portanto com campos a mais
+        $fornecedorBonERP = $this->fornecedor_model->findby_id($fornecedorBonERP_id);
+        
         if ($fornecedorBonERP_id) {
             $atualizando = true;
             // $fornecedorBonERP['codigo'] = $fornecedorEkt['CODIGO'];
@@ -173,6 +192,7 @@ class ImportarFornecedores extends CI_Controller
         } else {
             echo "INSERINDO novo fornecedor... ";
             $fornecedorBonERP['codigo'] = $this->findNovoCodigo($fornecedorEkt['CODIGO']);
+            $fornecedorBonERP['codigo_ekt_desde'] = $this->dtMesano->format('Y-m-d');
         }
         echo $fornecedorEkt['CODIGO'] . " - " . $fornecedorEkt['NOME_FANTASIA'] . "\n";
         
@@ -304,9 +324,12 @@ class ImportarFornecedores extends CI_Controller
 
     /**
      *
-     * @param type $fornecedorEkt
-     * @param type $fornecedorId
-     * @param type $enderecoId
+     * @param
+     *            $fornecedorEkt
+     * @param
+     *            $fornecedorId
+     * @param
+     *            $enderecoId
      */
     private function salvarEndereco($fornecedorEkt, $fornecedorId, $enderecoId = null)
     {
@@ -351,10 +374,65 @@ class ImportarFornecedores extends CI_Controller
 
     /**
      *
-     * @param type $fornecedorBonERP
-     * @param type $fornecedorEkt
+     * @param
+     *            $fornecedorBonERP
+     * @param
+     *            $fornecedorEkt
      */
     private function salvarNaDePara($fornecedorBonERP, $fornecedorEkt)
+    {
+        echo "LIDANDO COM 'depara'... \n";
+        $fornecedorId = $fornecedorBonERP['id'];
+        
+        $sql = "SELECT * FROM est_fornecedor_codektmesano WHERE fornecedor_id = ? AND mesano = ? AND codigo_ekt = ?";
+        $params = array(
+            $fornecedorId,
+            $this->mesano,
+            $fornecedorEkt['CODIGO']
+        );
+        $r = $this->db->query($sql, $params)->result_array();
+        
+        if (count($r) > 0) {} else {
+            $codektmesano['fornecedor_id'] = $fornecedorId;
+            $codektmesano['mesano'] = $this->mesano;
+            $codektmesano['codigo_ekt'] = $fornecedorEkt['CODIGO'];
+            
+            $this->db->insert('est_fornecedor_codektmesano', $codektmesano);
+        }
+        
+        // verifica se o mesano é menor que o codigo_ekt_desde
+        // se for, seta o codigo_ekt_desde pro mesano
+        if (array_key_exists('codigo_ekt_desde', $fornecedorBonERP) and $fornecedorBonERP['codigo_ekt_desde']) {
+            $dt_cod_ekt_desde = DateTime::createFromFormat('Y-m-d', $fornecedorBonERP['codigo_ekt_desde']);
+            $dt_cod_ekt_desde->setTime(0, 0, 0, 0);
+            if ($this->dtMesano < $dt_cod_ekt_desde) {
+                $fornecedorBonERP['codigo_ekt_desde'] = $this->dtMesano->format('Y-m-d');
+                $this->db->update('est_fornecedor', $fornecedorBonERP, array('id' => $fornecedorBonERP['id'])) or die("Erro ao atualizar 'codigo_ekt_desde'");
+            }
+        }
+        
+        // verifica se o mesano é maior que o codigo_ekt_ate
+        // se for, seta o codigo_ekt_ate pro mesano
+        if (array_key_exists('codigo_ekt_ate', $fornecedorBonERP) and $fornecedorBonERP['codigo_ekt_ate']) {
+            $dt_cod_ekt_ate = DateTime::createFromFormat('Y-m-d', $fornecedorBonERP['codigo_ekt_ate']);
+            $dt_cod_ekt_ate->setTime(0, 0, 0, 0);
+            if ($this->dtMesano > $dt_cod_ekt_ate) {
+                $fornecedorBonERP['codigo_ekt_ate'] = $this->dtMesano->format('Y-m-d');
+                $this->db->update('est_fornecedor', $fornecedorBonERP, array('id' => $fornecedorBonERP['id'])) or die("Erro ao atualizar 'codigo_ekt_ate'");
+            }
+        }
+        
+        echo "OK.\n\n";
+    }
+
+    /**
+     *
+     * @param
+     *            $fornecedorBonERP
+     * @param
+     *            $fornecedorEkt
+     */
+    private function salvarNaDePara_old($fornecedorBonERP, $fornecedorEkt)
     {
         echo "LIDANDO COM a 'depara'... \n";
         $fornecedorId = $fornecedorBonERP['id'];

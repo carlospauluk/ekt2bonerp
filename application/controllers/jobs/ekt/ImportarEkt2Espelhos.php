@@ -2,6 +2,19 @@
 
 /**
  * Job que realiza a importação dos dados nos CSVs gerados pelo EKT para as tabelas espelho (ekt_*).
+ * 
+ * Para rodar:
+ * 
+ * Pela linha de comando, chamar com:
+ *
+ *
+ * set EKT_CSVS_PATH=\\10.1.1.100\export
+ * set EKT_LOG_PATH=C:\ekt2bonerp\log\
+ *
+ * export EKT_CSVS_PATH=/mnt/10.1.1.100-export/
+ * export EKT_LOG_PATH=~/dev/github/ekt2bonerp/log/
+ *
+ * php index.php jobs/ekt/ImportarEkt2Espelhos importar YYYYMM FOR-PROD-...
  */
 class ImportarEkt2Espelhos extends CI_Controller
 {
@@ -48,21 +61,16 @@ class ImportarEkt2Espelhos extends CI_Controller
         error_reporting(E_ALL);
         ini_set('display_errors', 1);
         
+        
+        $this->load->model('est/produto_model');
         $this->agora = new DateTime();
     }
 
     /**
-     * Método principal
+     * Método principal.
      *
      * $mesano (deve ser passado no formato YYYYMM).
      * $importadores (GERAIS,FOR,PROD,PED,VEN,ENC).
-     *
-     * Pela linha de comando, chamar com:
-     *
-     * export ou set EKT_CSVS_PATH=/mnt/10.1.1.100-export/
-     * export ou set EKT_LOG_PATH=~/dev/github/ekt2bonerp/log/
-     *
-     * php index.php jobs/ekt/ImportarEkt2Espelhos importar YYYYMM FOR-PROD-...
      */
     public function importar($mesano, $importadores)
     {
@@ -73,6 +81,13 @@ class ImportarEkt2Espelhos extends CI_Controller
         $this->csvsPath = getenv('EKT_CSVS_PATH') or die("EKT_CSVS_PATH não informado\n\n\n");
         $this->logPath = getenv('EKT_LOG_PATH') or die("EKT_LOG_PATH não informado\n\n\n");
         
+        $this->mesAno = $mesano;
+        
+        // Se o mesano passado não for o corrente, vai buscar os csvs nas pastas arquivadas.
+        if ($this->agora->format('Ym') != $mesano) {
+            $this->csvsPath .= "/" . $mesano . "/";
+        }
+        
         echo "csvsPath: [" . $this->csvsPath . "]" . PHP_EOL;
         echo "logPath: [" . $this->logPath . "]" . PHP_EOL;
         $this->logFile = $this->logPath . str_replace(" ", "_", $importadores) . "-" . $this->agora->format('Y-m-d_H-i-s') . ".txt";
@@ -80,7 +95,7 @@ class ImportarEkt2Espelhos extends CI_Controller
         
         echo "Iniciando a importação para o mês/ano: [" . $mesano . "]" . PHP_EOL;
         
-        $this->mesAno = $mesano;
+            
         $this->dtMesAno = DateTime::createFromFormat('Ymd', $mesano . "01");
         if (! $this->dtMesAno instanceof DateTime) {
             die("mesano inválido.\n\n\n");
@@ -101,6 +116,10 @@ class ImportarEkt2Espelhos extends CI_Controller
             }
         }
         
+        if (in_array('GERAIS', $tiposImportacoes)) {
+            $this->importarDeptos();
+            $this->importarSubdeptos();
+        }
         if (in_array('FOR', $tiposImportacoes)) {
             $this->importarFornecedores();
         }
@@ -115,12 +134,192 @@ class ImportarEkt2Espelhos extends CI_Controller
         if (in_array('PED', $tiposImportacoes)) {
             $this->importarPedidos();
         }
+        if (in_array('ENC', $tiposImportacoes)) {
+            $this->importarEncomendas();
+            $this->importarEncomendasItens();
+        }
         
         $time_end = microtime(true);
         $execution_time = ($time_end - $time_start);
         echo "\n\n\n\n----------------------------------\nTotal Execution Time: " . $execution_time . "s\n\n";
     }
 
+    /*
+     *
+     */
+    public function importarDeptos()
+    {
+        $this->db->trans_start();
+        
+        echo "IMPORTANDO DEPTOS..." . PHP_EOL . PHP_EOL;
+        
+        $model = new \CIBases\Models\DAO\Base\Base_model('ekt_depto');
+                     
+        
+        if (! $this->db->query("DELETE FROM ekt_depto WHERE mesano = ?", array(
+            $this->mesAno
+        ))) {
+            log_message('error', 'DELETE FROM ekt_depto WHERE mesano = ?');
+            return;
+        }
+        
+        $linhas = file($this->csvsPath . "est_d003.csv");
+        
+        $i = 0;
+        
+        $todos = array();
+        
+        foreach ($linhas as $linha) {
+            
+            $i ++;
+            $campos = explode(";", $linha);
+            if (count($campos) < 6) {
+                die("A linha deve ter 6 campos. LINHA: [" + $linha + "]");
+            }
+            
+            $ektDepto = array();
+            
+            // RECORD_NUMBER 4 INTEGER
+            // CODIGO 3 DECIMAL
+            // DESCRICAO 12 VARCHAR
+            // MARGEM 3 DECIMAL
+            // PECAS_AC 3 DECIMAL
+            // VENDAS_AC 3 DECIMAL
+            
+            $ektDepto['RECORD_NUMBER'] = $i;
+            $ektDepto['CODIGO'] = $campos[1];
+            $ektDepto['DESCRICAO'] = $campos[2];
+            $ektDepto['MARGEM'] = $campos[3];
+            $ektDepto['PECAS_AC'] = $campos[4];
+            $ektDepto['VENDAS_AC'] = $campos[5];
+            $ektDepto['mesano'] = $this->mesAno;
+            
+            $this->handleIudtUserInfo($ektDepto);
+            
+            if (! $this->db->insert('ekt_depto', $ektDepto)) {
+                log_message('error', 'Erro ao salvar o ektDepto');
+                return;
+            } else {
+                echo $i . " depto(s) inserido(s)." . PHP_EOL;
+            }
+        }
+        
+        $this->db->trans_complete();
+    }
+    
+    /*
+     *
+     */
+    public function importarSubdeptos()
+    {
+        $this->db->trans_start();
+        
+        echo "IMPORTANDO SUBDEPTOS..." . PHP_EOL . PHP_EOL;
+        
+        $model = new \CIBases\Models\DAO\Base\Base_model('ekt_depto');
+        
+        if (! $this->db->query("DELETE FROM ekt_subdepto WHERE mesano = ?", array(
+            $this->mesAno
+        ))) {
+            log_message('error', 'DELETE FROM ekt_subdepto WHERE mesano = ?');
+            return;
+        }
+        
+        $linhas = file($this->csvsPath . "est_d004.csv");
+        
+        $i = 0;
+        
+        $todos = array();
+        
+        foreach ($linhas as $linha) {
+            
+            $i ++;
+            $campos = explode(";", $linha);
+            if (count($campos) < 29) {
+                die("A linha deve ter 29 campos. LINHA: [" + $linha + "]");
+            }
+            
+            $ektSubdepto = array();
+            
+            //			RECORD_NUMBER	4	INTEGER
+            //			CODIGO	3	DECIMAL
+            //			DESCRICAO	12	VARCHAR
+            //			MARGEM	3	DECIMAL
+            //			PECAS_AC01	3	DECIMAL
+            //			PECAS_AC02	3	DECIMAL
+            //			PECAS_AC03	3	DECIMAL
+            //			PECAS_AC04	3	DECIMAL
+            //			PECAS_AC05	3	DECIMAL
+            //			PECAS_AC06	3	DECIMAL
+            //			PECAS_AC07	3	DECIMAL
+            //			PECAS_AC08	3	DECIMAL
+            //			PECAS_AC09	3	DECIMAL
+            //			PECAS_AC10	3	DECIMAL
+            //			PECAS_AC11	3	DECIMAL
+            //			PECAS_AC12	3	DECIMAL
+            //			VENDAS_AC01	3	DECIMAL
+            //			VENDAS_AC02	3	DECIMAL
+            //			VENDAS_AC03	3	DECIMAL
+            //			VENDAS_AC04	3	DECIMAL
+            //			VENDAS_AC05	3	DECIMAL
+            //			VENDAS_AC06	3	DECIMAL
+            //			VENDAS_AC07	3	DECIMAL
+            //			VENDAS_AC08	3	DECIMAL
+            //			VENDAS_AC09	3	DECIMAL
+            //			VENDAS_AC10	3	DECIMAL
+            //			VENDAS_AC11	3	DECIMAL
+            //			VENDAS_AC12	3	DECIMAL
+            //			SAZON	12	VARCHAR
+            
+            $ektSubdepto['RECORD_NUMBER'] = $i;
+            $ektSubdepto['CODIGO'] = $campos[1];
+            $ektSubdepto['DESCRICAO'] = $campos[2];
+            $ektSubdepto['MARGEM'] = $campos[3];
+            $ektSubdepto['PECAS_AC01'] = $campos[4];
+            $ektSubdepto['PECAS_AC02'] = $campos[5];
+            $ektSubdepto['PECAS_AC03'] = $campos[6];
+            $ektSubdepto['PECAS_AC04'] = $campos[7];
+            $ektSubdepto['PECAS_AC05'] = $campos[8];
+            $ektSubdepto['PECAS_AC06'] = $campos[9];
+            $ektSubdepto['PECAS_AC07'] = $campos[10];
+            $ektSubdepto['PECAS_AC08'] = $campos[11];
+            $ektSubdepto['PECAS_AC09'] = $campos[12];
+            $ektSubdepto['PECAS_AC10'] = $campos[13];
+            $ektSubdepto['PECAS_AC11'] = $campos[14];
+            $ektSubdepto['PECAS_AC12'] = $campos[15];
+            $ektSubdepto['VENDAS_AC01'] = $campos[16];
+            $ektSubdepto['VENDAS_AC02'] = $campos[17];
+            $ektSubdepto['VENDAS_AC03'] = $campos[18];
+            $ektSubdepto['VENDAS_AC04'] = $campos[19];
+            $ektSubdepto['VENDAS_AC05'] = $campos[20];
+            $ektSubdepto['VENDAS_AC06'] = $campos[21];
+            $ektSubdepto['VENDAS_AC07'] = $campos[22];
+            $ektSubdepto['VENDAS_AC08'] = $campos[23];
+            $ektSubdepto['VENDAS_AC09'] = $campos[24];
+            $ektSubdepto['VENDAS_AC10'] = $campos[25];
+            $ektSubdepto['VENDAS_AC11'] = $campos[26];
+            $ektSubdepto['VENDAS_AC12'] = $campos[27];
+            $ektSubdepto['SAZON'] = $campos[28];
+            
+            $ektSubdepto['mesano'] = $this->mesAno;
+            
+            $this->handleIudtUserInfo($ektSubdepto);
+            
+            if (! $this->db->insert('ekt_subdepto', $ektSubdepto)) {
+                log_message('error', 'Erro ao salvar o ekt_subdepto');
+                return;
+            } else {
+                echo $i . " subdepto(s) inserido(s)." . PHP_EOL;
+            }
+        }
+        
+        $this->db->trans_complete();
+    }
+    
+    
+
+    /**
+     */
     public function importarFornecedores()
     {
         $this->db->trans_start();
@@ -228,6 +427,8 @@ class ImportarEkt2Espelhos extends CI_Controller
         $this->db->trans_complete();
     }
 
+    /**
+     */
     public function importarProdutos()
     {
         $this->db->trans_start();
@@ -360,6 +561,8 @@ class ImportarEkt2Espelhos extends CI_Controller
         $this->db->trans_complete();
     }
 
+    /**
+     */
     public function importarVendedores()
     {
         $this->db->trans_start();
@@ -412,6 +615,8 @@ class ImportarEkt2Espelhos extends CI_Controller
         $this->db->trans_complete();
     }
 
+    /**
+     */
     public function importarVendas()
     {
         $this->db->trans_start();
@@ -505,6 +710,8 @@ class ImportarEkt2Espelhos extends CI_Controller
         $this->db->trans_complete();
     }
 
+    /**
+     */
     public function importarVendasItens()
     {
         $this->db->trans_start();
@@ -566,6 +773,8 @@ class ImportarEkt2Espelhos extends CI_Controller
         $this->db->trans_complete();
     }
 
+    /**
+     */
     public function importarPedidos()
     {
         $this->db->trans_start();
@@ -607,11 +816,11 @@ class ImportarEkt2Espelhos extends CI_Controller
             $pedido = $campos[1];
             
             // Verifica se já existe para não reimportar.
-//             $jaExiste = $model->findby_pedido($pedido);
-//             if ($jaExiste) {
-//                 echo "PEDIDO $pedido já existente na base." . PHP_EOL;
-//                 continue;
-//             }
+            // $jaExiste = $model->findby_pedido($pedido);
+            // if ($jaExiste) {
+            // echo "PEDIDO $pedido já existente na base." . PHP_EOL;
+            // continue;
+            // }
             
             $ektPedido['RECORD_NUMBER'] = $i;
             $ektPedido['PEDIDO'] = $pedido;
@@ -651,6 +860,164 @@ class ImportarEkt2Espelhos extends CI_Controller
         $this->db->trans_complete();
     }
 
+    /**
+     */
+    public function importarEncomendas()
+    {
+        $this->db->trans_start();
+        
+        echo PHP_EOL . PHP_EOL . "IMPORTANDO ENCOMENDAS..." . PHP_EOL . PHP_EOL;
+        
+        $this->load->model('ekt/ektencomenda_model');
+        $model = $this->ektencomenda_model;
+        
+        if (! $model->truncate_table()) {
+            log_message('error', 'Erro em truncate table');
+            return;
+        }
+        
+        $linhas = file($this->csvsPath . "ped_d070.csv");
+        
+        if (! $linhas or count($linhas) < 0) {
+            die("importarEncomendas() - Sem dados para importar");
+        }
+        
+        $i = 0;
+        
+        $todos = array();
+        
+        foreach ($linhas as $linha) {
+            
+            $i ++;
+            $campos = explode(";", str_replace('\n', '', $linha));
+            
+            $ektEncomenda = array();
+            
+            $numEncomenda = $campos[0];
+            
+            $ektEncomenda['RECORD_NUMBER'] = $i;
+            $ektEncomenda['NUMERO'] = $numEncomenda;
+            $ektEncomenda['SERIE'] = $campos[1];
+            $ektEncomenda['EMISSAO'] = $this->datetime_library->dateStrToSqlDate($campos[2], '');
+            $ektEncomenda['VENDEDOR'] = $campos[3];
+            $ektEncomenda['COD_PLANO'] = $campos[4];
+            $ektEncomenda['PLANO'] = $campos[5];
+            $ektEncomenda['MENSAGEM'] = $campos[6];
+            $ektEncomenda['HIST_DESC'] = $campos[7];
+            $ektEncomenda['SUB_TOTAL'] = $campos[8];
+            $ektEncomenda['DESC_ACRES'] = $campos[9];
+            $ektEncomenda['DESC_ESPECIAL'] = $campos[10];
+            $ektEncomenda['TOTAL'] = $campos[11];
+            $ektEncomenda['NOME_CLIENTE'] = $campos[12];
+            $ektEncomenda['COND_PAG'] = $campos[13];
+            $ektEncomenda['FLAG_DV'] = $campos[14];
+            $ektEncomenda['EMITIDO'] = $campos[15];
+            $ektEncomenda['V1'] = $this->datetime_library->dateStrToSqlDate($campos[16], '');
+            $ektEncomenda['V2'] = $this->datetime_library->dateStrToSqlDate($campos[17], '');
+            $ektEncomenda['V3'] = $this->datetime_library->dateStrToSqlDate($campos[18], '');
+            $ektEncomenda['V4'] = $this->datetime_library->dateStrToSqlDate($campos[19], '');
+            $ektEncomenda['V5'] = $this->datetime_library->dateStrToSqlDate($campos[20], '');
+            $ektEncomenda['V6'] = $this->datetime_library->dateStrToSqlDate($campos[21], '');
+            $ektEncomenda['P1'] = $campos[22];
+            $ektEncomenda['P2'] = $campos[23];
+            $ektEncomenda['P3'] = $campos[24];
+            $ektEncomenda['P4'] = $campos[25];
+            $ektEncomenda['P5'] = $campos[26];
+            $ektEncomenda['P6'] = $campos[27];
+            $ektEncomenda['CLIENTE'] = $campos[28];
+            $ektEncomenda['FONE'] = $campos[29];
+            $ektEncomenda['PRAZO'] = $campos[30];
+            $ektEncomenda['SDO_PAGAR'] = $campos[31];
+            
+            $ektEncomenda['mesano'] = $this->mesAno;
+            
+            $this->handleIudtUserInfo($ektEncomenda);
+            
+            if (! $this->db->insert('ekt_encomenda', $ektEncomenda)) {
+                log_message('error', 'Erro ao salvar o ektEncomenda');
+                return;
+            } else {
+                echo $i . " encomenda(s) inserida(s)." . PHP_EOL;
+            }
+        }
+        
+        $this->db->trans_complete();
+    }
+
+    /**
+     */
+    public function importarEncomendasItens()
+    {
+        $this->db->trans_start();
+        
+        echo PHP_EOL . PHP_EOL . "IMPORTANDO ITENS DE ENCOMENDAS..." . PHP_EOL . PHP_EOL;
+        
+        $this->load->model('ekt/ektencomendaitem_model');
+        $model = $this->ektencomendaitem_model;
+        
+        if (! $model->truncate_table()) {
+            log_message('error', 'Erro em truncate table');
+            return;
+        }
+        
+        $linhas = file($this->csvsPath . "ped_d071.csv");
+        
+        if (! $linhas or count($linhas) < 0) {
+            die("importarEncomendasItens() - Sem dados para importar");
+        }
+        
+        $i = 0;
+        
+        $todos = array();
+        
+        foreach ($linhas as $linha) {
+            
+            $i ++;
+            $campos = explode(";", str_replace('\n', '', $linha));
+            
+            $ektEncomendaItem = array();
+            
+            $ektEncomendaItem['RECORD_NUMBER'] = $i;
+            $ektEncomendaItem['NUMERO_NF'] = $campos[1];
+            $ektEncomendaItem['SERIE'] = $campos[2];
+            $ektEncomendaItem['TELA'] = $campos[3];
+            $ektEncomendaItem['PRODUTO'] = $campos[4];
+            $ektEncomendaItem['QTDE'] = $campos[5];
+            $ektEncomendaItem['UNIDADE'] = $campos[6];
+            $ektEncomendaItem['DESCRICAO'] = $campos[7];
+            $ektEncomendaItem['TAMANHO'] = $campos[8];
+            $ektEncomendaItem['VLR_UNIT'] = $campos[9];
+            $ektEncomendaItem['VLR_TOTAL'] = $campos[10];
+            $ektEncomendaItem['WIN'] = $campos[11];
+            $ektEncomendaItem['PRECO_CUSTO'] = $campos[12];
+            $ektEncomendaItem['PRECO_VISTA'] = $campos[13];
+            $ektEncomendaItem['OBS'] = $campos[14];
+            $ektEncomendaItem['FLAG'] = $campos[15];
+            $ektEncomendaItem['FORNEC'] = $campos[16];
+            $ektEncomendaItem['REFERENCIA'] = $campos[17];
+            $ektEncomendaItem['GRADE'] = $campos[18];
+            $ektEncomendaItem['DEPTO'] = $campos[19];
+            $ektEncomendaItem['SUBDEPTO'] = $campos[20];
+            $ektEncomendaItem['EMISSAO'] = $this->datetime_library->dateStrToSqlDate($campos[21], '');
+            $ektEncomendaItem['FLAG_INT'] = $campos[22];
+            
+            $ektEncomendaItem['mesano'] = $this->mesAno;
+            
+            $this->handleIudtUserInfo($ektEncomendaItem);
+            
+            if (! $this->db->insert('ekt_encomenda_item', $ektEncomendaItem)) {
+                log_message('error', 'Erro ao salvar o ektEncomendaItem');
+                return;
+            } else {
+                echo $i . " item(ns) de encomenda inserido(s)." . PHP_EOL;
+            }
+        }
+        
+        $this->db->trans_complete();
+    }
+
+    /**
+     */
     private function handleIudtUserInfo(&$entity)
     {
         $entity['inserted'] = $this->agora->format('Y-m-d H:i:s');
