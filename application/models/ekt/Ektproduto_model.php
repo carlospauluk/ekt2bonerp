@@ -1,7 +1,12 @@
 <?php
 
-class Ektproduto_model extends CI_Model
+class Ektproduto_model extends CIBases\Models\DAO\Base\Base_model
 {
+
+    public function __construct()
+    {
+        parent::__construct("ekt_produto", "ekt");
+    }
 
     public function findByMesano($mesano)
     {

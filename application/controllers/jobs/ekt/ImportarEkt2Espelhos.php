@@ -50,13 +50,26 @@ class ImportarEkt2Espelhos extends CI_Controller
      * @var DateTime
      */
     private $dtMesAno;
+    
+    /**
+     * Conexão ao db ekt.
+     */
+    private $dbekt;
+    
+    /**
+     * Conexão ao db bonerp.
+     */
+    private $dbbonerp;
 
     public function __construct()
     {
         parent::__construct();
         ini_set('max_execution_time', 0);
         ini_set('memory_limit', '2048M');
-        $this->load->database();
+        
+        $this->dbekt =  $this->load->database('ekt', TRUE);
+        $this->dbbonerp =  $this->load->database('bonerp', TRUE);
+        
         $this->load->library('datetime_library');
         error_reporting(E_ALL);
         ini_set('display_errors', 1);
@@ -149,14 +162,14 @@ class ImportarEkt2Espelhos extends CI_Controller
      */
     public function importarDeptos()
     {
-        $this->db->trans_start();
+        $this->dbekt->trans_start();
         
         echo "IMPORTANDO DEPTOS..." . PHP_EOL . PHP_EOL;
         
         $model = new \CIBases\Models\DAO\Base\Base_model('ekt_depto');
                      
         
-        if (! $this->db->query("DELETE FROM ekt_depto WHERE mesano = ?", array(
+        if (! $this->dbekt->query("DELETE FROM ekt_depto WHERE mesano = ?", array(
             $this->mesAno
         ))) {
             log_message('error', 'DELETE FROM ekt_depto WHERE mesano = ?');
@@ -196,7 +209,7 @@ class ImportarEkt2Espelhos extends CI_Controller
             
             $this->handleIudtUserInfo($ektDepto);
             
-            if (! $this->db->insert('ekt_depto', $ektDepto)) {
+            if (! $this->dbekt->insert('ekt_depto', $ektDepto)) {
                 log_message('error', 'Erro ao salvar o ektDepto');
                 return;
             } else {
@@ -204,7 +217,7 @@ class ImportarEkt2Espelhos extends CI_Controller
             }
         }
         
-        $this->db->trans_complete();
+        $this->dbekt->trans_complete();
     }
     
     /*
@@ -212,13 +225,13 @@ class ImportarEkt2Espelhos extends CI_Controller
      */
     public function importarSubdeptos()
     {
-        $this->db->trans_start();
+        $this->dbekt->trans_start();
         
         echo "IMPORTANDO SUBDEPTOS..." . PHP_EOL . PHP_EOL;
         
         $model = new \CIBases\Models\DAO\Base\Base_model('ekt_depto');
         
-        if (! $this->db->query("DELETE FROM ekt_subdepto WHERE mesano = ?", array(
+        if (! $this->dbekt->query("DELETE FROM ekt_subdepto WHERE mesano = ?", array(
             $this->mesAno
         ))) {
             log_message('error', 'DELETE FROM ekt_subdepto WHERE mesano = ?');
@@ -305,7 +318,7 @@ class ImportarEkt2Espelhos extends CI_Controller
             
             $this->handleIudtUserInfo($ektSubdepto);
             
-            if (! $this->db->insert('ekt_subdepto', $ektSubdepto)) {
+            if (! $this->dbekt->insert('ekt_subdepto', $ektSubdepto)) {
                 log_message('error', 'Erro ao salvar o ekt_subdepto');
                 return;
             } else {
@@ -313,7 +326,7 @@ class ImportarEkt2Espelhos extends CI_Controller
             }
         }
         
-        $this->db->trans_complete();
+        $this->dbekt->trans_complete();
     }
     
     
@@ -322,7 +335,7 @@ class ImportarEkt2Espelhos extends CI_Controller
      */
     public function importarFornecedores()
     {
-        $this->db->trans_start();
+        $this->dbekt->trans_start();
         
         echo "IMPORTANDO FORNECEDORES..." . PHP_EOL . PHP_EOL;
         
@@ -416,7 +429,7 @@ class ImportarEkt2Espelhos extends CI_Controller
             
             $this->handleIudtUserInfo($ektFornecedor);
             
-            if (! $this->db->insert('ekt_fornecedor', $ektFornecedor)) {
+            if (! $this->dbekt->insert('ekt_fornecedor', $ektFornecedor)) {
                 log_message('error', 'Erro ao salvar o ektFornecedor');
                 return;
             } else {
@@ -424,14 +437,14 @@ class ImportarEkt2Espelhos extends CI_Controller
             }
         }
         
-        $this->db->trans_complete();
+        $this->dbekt->trans_complete();
     }
 
     /**
      */
     public function importarProdutos()
     {
-        $this->db->trans_start();
+        $this->dbekt->trans_start();
         
         echo PHP_EOL . PHP_EOL . "IMPORTANDO PRODUTOS..." . PHP_EOL . PHP_EOL;
         
@@ -550,7 +563,7 @@ class ImportarEkt2Espelhos extends CI_Controller
             
             $this->handleIudtUserInfo($ektProduto);
             
-            if (! $this->db->insert('ekt_produto', $ektProduto)) {
+            if (! $this->dbekt->insert('ekt_produto', $ektProduto)) {
                 log_message('error', 'Erro ao salvar o ektProduto');
                 return;
             } else {
@@ -558,14 +571,14 @@ class ImportarEkt2Espelhos extends CI_Controller
             }
         }
         
-        $this->db->trans_complete();
+        $this->dbekt->trans_complete();
     }
 
     /**
      */
     public function importarVendedores()
     {
-        $this->db->trans_start();
+        $this->dbekt->trans_start();
         
         echo PHP_EOL . PHP_EOL . "IMPORTANDO VENDEDORES..." . PHP_EOL . PHP_EOL;
         
@@ -604,7 +617,7 @@ class ImportarEkt2Espelhos extends CI_Controller
             
             $this->handleIudtUserInfo($ektVendedor);
             
-            if (! $this->db->insert('ekt_vendedor', $ektVendedor)) {
+            if (! $this->dbekt->insert('ekt_vendedor', $ektVendedor)) {
                 log_message('error', 'Erro ao salvar o ektVendedor');
                 return;
             } else {
@@ -612,14 +625,14 @@ class ImportarEkt2Espelhos extends CI_Controller
             }
         }
         
-        $this->db->trans_complete();
+        $this->dbekt->trans_complete();
     }
 
     /**
      */
     public function importarVendas()
     {
-        $this->db->trans_start();
+        $this->dbekt->trans_start();
         
         echo PHP_EOL . PHP_EOL . "IMPORTANDO VENDAS..." . PHP_EOL . PHP_EOL;
         
@@ -699,7 +712,7 @@ class ImportarEkt2Espelhos extends CI_Controller
             
             $this->handleIudtUserInfo($ektVenda);
             
-            if (! $this->db->insert('ekt_venda', $ektVenda)) {
+            if (! $this->dbekt->insert('ekt_venda', $ektVenda)) {
                 log_message('error', 'Erro ao salvar o ektVenda');
                 return;
             } else {
@@ -707,14 +720,14 @@ class ImportarEkt2Espelhos extends CI_Controller
             }
         }
         
-        $this->db->trans_complete();
+        $this->dbekt->trans_complete();
     }
 
     /**
      */
     public function importarVendasItens()
     {
-        $this->db->trans_start();
+        $this->dbekt->trans_start();
         
         echo PHP_EOL . PHP_EOL . "IMPORTANDO ITENS DAS VENDAS..." . PHP_EOL . PHP_EOL;
         
@@ -762,7 +775,7 @@ class ImportarEkt2Espelhos extends CI_Controller
             
             $this->handleIudtUserInfo($ektVendaItem);
             
-            if (! $this->db->insert('ekt_venda_item', $ektVendaItem)) {
+            if (! $this->dbekt->insert('ekt_venda_item', $ektVendaItem)) {
                 log_message('error', 'Erro ao salvar o ektVendaItem');
                 return;
             } else {
@@ -770,14 +783,14 @@ class ImportarEkt2Espelhos extends CI_Controller
             }
         }
         
-        $this->db->trans_complete();
+        $this->dbekt->trans_complete();
     }
 
     /**
      */
     public function importarPedidos()
     {
-        $this->db->trans_start();
+        $this->dbekt->trans_start();
         
         echo PHP_EOL . PHP_EOL . "IMPORTANDO PEDIDOS..." . PHP_EOL . PHP_EOL;
         
@@ -849,7 +862,7 @@ class ImportarEkt2Espelhos extends CI_Controller
             
             $this->handleIudtUserInfo($ektPedido);
             
-            if (! $this->db->insert('ekt_pedido', $ektPedido)) {
+            if (! $this->dbekt->insert('ekt_pedido', $ektPedido)) {
                 log_message('error', 'Erro ao salvar o ektPedido');
                 return;
             } else {
@@ -857,14 +870,14 @@ class ImportarEkt2Espelhos extends CI_Controller
             }
         }
         
-        $this->db->trans_complete();
+        $this->dbekt->trans_complete();
     }
 
     /**
      */
     public function importarEncomendas()
     {
-        $this->db->trans_start();
+        $this->dbekt->trans_start();
         
         echo PHP_EOL . PHP_EOL . "IMPORTANDO ENCOMENDAS..." . PHP_EOL . PHP_EOL;
         
@@ -933,7 +946,7 @@ class ImportarEkt2Espelhos extends CI_Controller
             
             $this->handleIudtUserInfo($ektEncomenda);
             
-            if (! $this->db->insert('ekt_encomenda', $ektEncomenda)) {
+            if (! $this->dbekt->insert('ekt_encomenda', $ektEncomenda)) {
                 log_message('error', 'Erro ao salvar o ektEncomenda');
                 return;
             } else {
@@ -941,14 +954,14 @@ class ImportarEkt2Espelhos extends CI_Controller
             }
         }
         
-        $this->db->trans_complete();
+        $this->dbekt->trans_complete();
     }
 
     /**
      */
     public function importarEncomendasItens()
     {
-        $this->db->trans_start();
+        $this->dbekt->trans_start();
         
         echo PHP_EOL . PHP_EOL . "IMPORTANDO ITENS DE ENCOMENDAS..." . PHP_EOL . PHP_EOL;
         
@@ -1005,7 +1018,7 @@ class ImportarEkt2Espelhos extends CI_Controller
             
             $this->handleIudtUserInfo($ektEncomendaItem);
             
-            if (! $this->db->insert('ekt_encomenda_item', $ektEncomendaItem)) {
+            if (! $this->dbekt->insert('ekt_encomenda_item', $ektEncomendaItem)) {
                 log_message('error', 'Erro ao salvar o ektEncomendaItem');
                 return;
             } else {
@@ -1013,7 +1026,7 @@ class ImportarEkt2Espelhos extends CI_Controller
             }
         }
         
-        $this->db->trans_complete();
+        $this->dbekt->trans_complete();
     }
 
     /**

@@ -1,13 +1,18 @@
 <?php
 
-class Ektpedido_model extends CI_Model
+class Ektpedido_model extends CIBases\Models\DAO\Base\Base_model
 {
-    
-    public function truncate_table() {
+
+    public function __construct()
+    {
+        parent::__construct("ekt_pedido", "ekt");
+    }
+
+    public function truncate_table()
+    {
         $sql = "TRUNCATE TABLE ekt_pedido";
         return $this->db->query($sql);
     }
-    
 
     public function findby_pedido($pedido)
     {

@@ -9,7 +9,7 @@ class Fornecedor_model extends CIBases\Models\DAO\Base\Base_model
 
     public function __construct()
     {
-        parent::__construct("est_fornecedor");
+        parent::__construct("est_fornecedor", "bonerp");
     }
 
     public function findByCodigoEkt($codigo, \DateTime $dtMesano)

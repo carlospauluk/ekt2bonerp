@@ -6,7 +6,7 @@ class Divida_model extends CI_Model {
 
     public function __construct() {
         parent::__construct();
-        $this->load->database();
+//         $this->load->database();
     }
 
     public function listall_ddpcg($carteira = null) {

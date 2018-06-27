@@ -4,7 +4,7 @@ class Vendas_result_model extends CI_Model {
 
     public function __construct() {
         parent::__construct();
-        $this->load->database();
+//         $this->load->database();
     }
 
     public function total_por_deptos($mesano_desde, $mesano_ate) {

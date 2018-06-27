@@ -9,7 +9,7 @@ class Produto_model extends CIBases\Models\DAO\Base\Base_model
 
     public function __construct()
     {
-        parent::__construct("est_produto");
+        parent::__construct("est_produto", "bonerp");
     }
 
     public function findByReduzidoEkt($reduzidoEkt, $dtImportacao = null)

@@ -13,11 +13,11 @@ class Base_model extends \CI_Model
 
     public $formatters = array();
 
-    public function __construct($table)
+    public function __construct($table, $database='default')
     {
         parent::__construct();
-        $this->load->database();
         $this->table = $table;
+        $this->db = $this->load->database($database,TRUE);
         $this->fetch_fields();
     }
 
