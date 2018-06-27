@@ -20,6 +20,10 @@ class Base_model extends \CI_Model
         $this->db = $this->load->database($database,TRUE);
         $this->fetch_fields();
     }
+    
+    public function setDb($db) {
+        $this->db = $db;
+    }
 
     public function findby_id($id)
     {

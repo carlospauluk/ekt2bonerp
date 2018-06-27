@@ -166,9 +166,6 @@ class ImportarEkt2Espelhos extends CI_Controller
         
         echo "IMPORTANDO DEPTOS..." . PHP_EOL . PHP_EOL;
         
-        $model = new \CIBases\Models\DAO\Base\Base_model('ekt_depto');
-                     
-        
         if (! $this->dbekt->query("DELETE FROM ekt_depto WHERE mesano = ?", array(
             $this->mesAno
         ))) {
@@ -228,8 +225,6 @@ class ImportarEkt2Espelhos extends CI_Controller
         $this->dbekt->trans_start();
         
         echo "IMPORTANDO SUBDEPTOS..." . PHP_EOL . PHP_EOL;
-        
-        $model = new \CIBases\Models\DAO\Base\Base_model('ekt_depto');
         
         if (! $this->dbekt->query("DELETE FROM ekt_subdepto WHERE mesano = ?", array(
             $this->mesAno
@@ -335,12 +330,14 @@ class ImportarEkt2Espelhos extends CI_Controller
      */
     public function importarFornecedores()
     {
-        $this->dbekt->trans_start();
         
         echo "IMPORTANDO FORNECEDORES..." . PHP_EOL . PHP_EOL;
         
         $this->load->model('ekt/ektfornecedor_model');
         $model = $this->ektfornecedor_model;
+        $model->setDb($this->dbekt);
+        
+        $this->dbekt->trans_start();
         
         if (! $model->delete_by_mesano($this->mesAno)) {
             log_message('error', 'Erro em deleteByMesAno');
@@ -457,6 +454,7 @@ class ImportarEkt2Espelhos extends CI_Controller
         
         $this->load->model('ekt/ektproduto_model');
         $model = $this->ektproduto_model;
+        $model->setDb($this->dbekt);
         
         if (! $model->delete_by_mesano($this->mesAno)) {
             log_message('error', 'Erro em deleteByMesAno');
@@ -591,6 +589,7 @@ class ImportarEkt2Espelhos extends CI_Controller
         
         $this->load->model('ekt/ektvendedor_model');
         $model = $this->ektvendedor_model;
+        $model->setDb($this->dbekt);
         
         if (! $model->truncate_table()) {
             log_message('error', 'Erro em truncate table');
@@ -645,6 +644,7 @@ class ImportarEkt2Espelhos extends CI_Controller
         
         $this->load->model('ekt/ektvenda_model');
         $model = $this->ektvenda_model;
+        $model->setDb($this->dbekt);
         
         if (! $model->delete_by_mesano($this->mesAno)) {
             log_message('error', 'Erro em deleteByMesAno');
@@ -740,6 +740,7 @@ class ImportarEkt2Espelhos extends CI_Controller
         
         $this->load->model('ekt/ektvendaitem_model');
         $model = $this->ektvendaitem_model;
+        $model->setDb($this->dbekt);
         
         if (! $model->delete_by_mesano($this->mesAno)) {
             log_message('error', 'Erro em deleteByMesAno');
@@ -803,6 +804,7 @@ class ImportarEkt2Espelhos extends CI_Controller
         
         $this->load->model('ekt/ektpedido_model');
         $model = $this->ektpedido_model;
+        $model->setDb($this->dbekt);
         
         if (! $model->truncate_table()) {
             log_message('error', 'Erro em truncate table');
@@ -890,6 +892,7 @@ class ImportarEkt2Espelhos extends CI_Controller
         
         $this->load->model('ekt/ektencomenda_model');
         $model = $this->ektencomenda_model;
+        $model->setDb($this->dbekt);
         
         if (! $model->truncate_table()) {
             log_message('error', 'Erro em truncate table');
@@ -974,6 +977,7 @@ class ImportarEkt2Espelhos extends CI_Controller
         
         $this->load->model('ekt/ektencomendaitem_model');
         $model = $this->ektencomendaitem_model;
+        $model->setDb($this->dbekt);
         
         if (! $model->truncate_table()) {
             log_message('error', 'Erro em truncate table');

@@ -16,9 +16,12 @@ class Ektfornecedor_model extends CIBases\Models\DAO\Base\Base_model
     {
         if (! $mesano)
             return false;
+        
         $sql = "DELETE FROM ekt_fornecedor WHERE mesano = ?";
         return $this->db->query($sql, array(
             $mesano
         ));
+        
     }
+    
 }
