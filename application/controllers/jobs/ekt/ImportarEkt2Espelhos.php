@@ -335,7 +335,7 @@ class ImportarEkt2Espelhos extends CI_Controller
      */
     public function importarFornecedores()
     {
-        // $this->dbekt->trans_start();
+        $this->dbekt->trans_start();
         
         echo "IMPORTANDO FORNECEDORES..." . PHP_EOL . PHP_EOL;
         
@@ -444,7 +444,7 @@ class ImportarEkt2Espelhos extends CI_Controller
             }
         }
         
-        // $this->dbekt->trans_complete();
+        $this->dbekt->trans_complete();
     }
 
     /**
