@@ -6,78 +6,33 @@
 class ImportarFornecedores extends CI_Controller
 {
 
-    private $inseridos;
+    private $inseridos = 0;
 
-    private $existentes;
+    private $atualizados = 0;
+
+    private $acertados_depara = 0;
+
+    /**
+     * Conexão ao db ekt.
+     */
+    private $dbekt;
+
+    /**
+     * Conexão ao db bonerp.
+     */
+    private $dbbonerp;
 
     public function __construct()
     {
         parent::__construct();
         ini_set('max_execution_time', 0);
         ini_set('memory_limit', '2048M');
-        $this->load->database();
+        
+        $this->dbekt = $this->load->database('ekt', TRUE);
+        $this->dbbonerp = $this->load->database('bonerp', TRUE);
+        
         error_reporting(E_ALL);
         ini_set('display_errors', 1);
-        $this->load->model('est/fornecedor_model');
-    }
-
-    /**
-     */
-    public function setar_codigos_ekt()
-    {
-        $time_start = microtime(true);
-        $this->db->trans_start();
-        
-        $sql = "SELECT * FROM ekt_fornecedor WHERE nome_fantasia IS NOT NULL AND trim(nome_fantasia) != '' ORDER BY id";
-        $query = $this->db->query($sql) or $this->exit_db_error();
-        $result = $query->result_array();
-        
-        echo "<pre>";
-        
-        $i = 0;
-        foreach ($result as $fornecedorEkt) {
-            
-            $nome = $fornecedorEkt['NOME_FANTASIA'];
-            $nome = preg_replace("( )", "", $nome);
-            echo "\n\n" . str_pad("", 150, "-") . " " . ++ $i . "\n";
-            echo "INICIANDO... " . $nome . "\n";
-            
-            if (! $nome) {
-                echo "Sem nome (código: " . $fornecedorEkt['CODIGO'] . ")\n\n";
-                continue;
-            }
-            
-            $query = $this->db->query("SELECT * FROM vw_est_fornecedor WHERE REPLACE(nome_fantasia,' ','') LIKE ? AND tipo = 'ESTOQUE'", array(
-                $nome
-            )) or $this->exit_db_error();
-            $r = $query->result_array();
-            
-            if (count($r) > 1) {
-                echo "\n\n" . str_pad("", 150, "%") . "\n";
-                echo "Mais de um encontrado: " . $nome;
-                echo "\n\n" . str_pad("", 150, "%") . "\n";
-                continue;
-            } else {
-                if (count($r) == 1) {
-                    echo "Somente um encontrado.\n";
-                    $fornecedorBonERP = $r[0];
-                    echo "OK\nSalvando na depara...";
-                    $this->salvarNaDePara($fornecedorBonERP, $fornecedorEkt);
-                    echo "OK.";
-                } else {
-                    echo "NENHUM ENCONTRADO... salvando...\n\n";
-                    $this->salvarFornecedor($fornecedorEkt);
-                }
-            }
-        }
-        
-        echo "FINALIZANDO.\n\n";
-        
-        $this->db->trans_complete();
-        
-        $time_end = microtime(true);
-        $execution_time = ($time_end - $time_start);
-        echo "\n\n\n\n----------------------------------\nTotal Execution Time: " . $execution_time . "s";
     }
 
     /**
@@ -86,7 +41,10 @@ class ImportarFornecedores extends CI_Controller
     public function importar($mesano)
     {
         $time_start = microtime(true);
-        $this->db->trans_start();
+        $this->dbbonerp->trans_start();
+        
+        $this->load->model('est/fornecedor_model');
+        $this->fornecedor_model->setDb($this->dbbonerp);
         
         $this->mesano = $mesano;
         $this->dtMesano = DateTime::createFromFormat('Ymd', $mesano . "01");
@@ -96,7 +54,7 @@ class ImportarFornecedores extends CI_Controller
         }
         
         $sql = "SELECT * FROM ekt_fornecedor WHERE mesano = ? ORDER BY id";
-        $query = $this->db->query($sql, $mesano) or $this->exit_db_error();
+        $query = $this->dbekt->query($sql, $mesano) or $this->exit_db_error();
         $result = $query->result_array();
         
         echo "<pre>";
@@ -106,12 +64,14 @@ class ImportarFornecedores extends CI_Controller
             $codigoEkt = $fornecedorEkt['CODIGO'];
             $nomeFantasia = trim($fornecedorEkt['NOME_FANTASIA']);
             
+            echo PHP_EOL . "EKT >>>>> Código: [" . $codigoEkt . "] Nome Fantasia: [" . $nomeFantasia . "]" . PHP_EOL;
+            
             // Pesquisa nos est_fornecedor pelo mesmo codigo_ekt, somente tipo 'ESTOQUE', e ainda vigentes (ate is NULL)
             $params = array(
                 $codigoEkt,
                 $nomeFantasia
             );
-            $query = $this->db->query("SELECT * FROM vw_est_fornecedor WHERE codigo_ekt = ? AND nome_fantasia = ? AND tipo = 'ESTOQUE'", $params) or $this->exit_db_error();
+            $query = $this->dbbonerp->query("SELECT * FROM vw_est_fornecedor WHERE codigo_ekt = ? AND nome_fantasia = ? AND tipo = 'ESTOQUE'", $params) or $this->exit_db_error();
             $r = $query->result_array();
             
             if (count($r) > 1) {
@@ -120,53 +80,30 @@ class ImportarFornecedores extends CI_Controller
                 // Não encontrou
                 if (count($r) == 0) {
                     // Simplesmente salva
+                    echo "Não existente. Salvando..." . PHP_EOL;
                     $this->salvarFornecedor($fornecedorEkt);
+                    $this->inseridos ++;
                 } else {
-                    // Já tem?
                     $fornecedorBonERP = $r[0];
-                    // Verificar se é o mesmo
-                    if ($this->checkMesmoNomeFantasia($fornecedorBonERP, $fornecedorEkt)) {
-                        // se for, só atualiza
-                        $this->salvarFornecedor($fornecedorEkt, $fornecedorBonERP);
-                    } else { // é um fornecedor com mesmo código, porém com nome fantasia diferente
-                        $this->salvarFornecedor($fornecedorEkt);
-                    }
+                    echo "Já existente. Atualizando..." . PHP_EOL;
+                    $this->salvarFornecedor($fornecedorEkt, $fornecedorBonERP);
+                    $this->atualizados ++;
                 }
+                echo "OK!!!" . PHP_EOL;
             }
         }
         
-        $this->db->trans_complete();
+        $this->dbbonerp->trans_complete();
         
-        echo "\n\n\nINSERIDOS: " . $this->inseridos;
-        echo "\nEXISTENTES: " . $this->existentes;
+        echo PHP_EOL . PHP_EOL . PHP_EOL;
+        echo "--------------------------------------------------------------" . PHP_EOL;
+        echo "INSERIDOS: " . $this->inseridos . PHP_EOL;
+        echo "ATUALIZADOS: " . $this->atualizados . PHP_EOL;
+        echo "ACERTADOS DEPARA: " . $this->acertados_depara . PHP_EOL;
         
         $time_end = microtime(true);
         $execution_time = ($time_end - $time_start);
         echo "\n\n\n\n----------------------------------\nTotal Execution Time: " . $execution_time . "s";
-    }
-
-    /**
-     * Verifica se é o mesmo fornecedor comparando os nomes fantasias.
-     *
-     * @param
-     *            $fornecedorBonERP
-     * @param
-     *            $fornecedorEkt
-     * @return boolean
-     */
-    private function checkMesmoNomeFantasia($fornecedorBonERP, $fornecedorEkt)
-    {
-        $nomeFantasiaBonERP = preg_replace("[^A-Za-z]", "", $fornecedorBonERP['nome_fantasia']);
-        $nomeFantasiaEkt = preg_replace("[^A-Za-z]", "", $fornecedorEkt['NOME_FANTASIA']);
-        
-        if (strcasecmp($nomeFantasiaBonERP, $nomeFantasiaEkt) == 0) {
-            return true;
-        } else {
-            if ((strpos($nomeFantasiaBonERP, $nomeFantasiaEkt) !== false) || (strpos($nomeFantasiaEkt, $nomeFantasiaBonERP) !== false)) {
-                return true;
-            }
-            return false;
-        }
     }
 
     /**
@@ -196,8 +133,7 @@ class ImportarFornecedores extends CI_Controller
         }
         echo $fornecedorEkt['CODIGO'] . " - " . $fornecedorEkt['NOME_FANTASIA'] . "\n";
         
-        // comentado para não setar aqui.. .só vai setar no salvarDePara
-        // $fornecedorBonERP['codigo_ekt'] = $fornecedorEkt['CODIGO'];
+        $fornecedorBonERP['codigo_ekt'] = $fornecedorEkt['CODIGO'];
         $fornecedorBonERP['inscricao_estadual'] = $fornecedorEkt['INSC'];
         $fornecedorBonERP['fone1'] = $fornecedorEkt['DDD_FONE'] . $fornecedorEkt['FONE'];
         $fornecedorBonERP['fone2'] = $fornecedorEkt['DDD_FAX'] . $fornecedorEkt['FAX'];
@@ -206,7 +142,7 @@ class ImportarFornecedores extends CI_Controller
         $fornecedorBonERP['representante_contato'] = $fornecedorEkt['DDD_REPRES'] . $fornecedorEkt['FONE_REPRES'];
         
         if ($atualizando) {
-            $query = $this->db->get_where("bon_pessoa", array(
+            $query = $this->dbbonerp->get_where("bon_pessoa", array(
                 'id' => $pessoaId
             )) or $this->exit_db_error();
             $r = $query->result_array();
@@ -231,7 +167,7 @@ class ImportarFornecedores extends CI_Controller
         
         if ($atualizando) {
             echo "Atualizando bon_pessoa... " . $pessoaId . "\n";
-            $this->db->update('bon_pessoa', $pessoa, array(
+            $this->dbbonerp->update('bon_pessoa', $pessoa, array(
                 'id' => $pessoaId
             )) or $this->exit_db_error();
         } else {
@@ -240,8 +176,8 @@ class ImportarFornecedores extends CI_Controller
             $pessoa['estabelecimento_id'] = 1;
             $pessoa['user_inserted_id'] = 1;
             $pessoa['user_updated_id'] = 1;
-            $this->db->insert('bon_pessoa', $pessoa) or $this->exit_db_error();
-            $pessoaId = $this->db->insert_id();
+            $this->dbbonerp->insert('bon_pessoa', $pessoa) or $this->exit_db_error();
+            $pessoaId = $this->dbbonerp->insert_id();
         }
         
         $fornecedorBonERP['updated'] = date("Y-m-d H:i:s");
@@ -250,7 +186,7 @@ class ImportarFornecedores extends CI_Controller
         
         if ($atualizando) {
             echo "UPDATE est_fornecedor...\n";
-            $this->db->update('est_fornecedor', $fornecedorBonERP, array(
+            $this->dbbonerp->update('est_fornecedor', $fornecedorBonERP, array(
                 'id' => $fornecedorBonERP_id
             )) or $this->exit_db_error();
         } else {
@@ -263,8 +199,8 @@ class ImportarFornecedores extends CI_Controller
                 echo "";
             }
             echo "INSERT na est_fornecedor... ";
-            $this->db->insert('est_fornecedor', $fornecedorBonERP) or $this->exit_db_error();
-            $fornecedorBonERP_id = $this->db->insert_id();
+            $this->dbbonerp->insert('est_fornecedor', $fornecedorBonERP) or $this->exit_db_error();
+            $fornecedorBonERP_id = $this->dbbonerp->insert_id();
             echo $fornecedorBonERP_id . "\n";
         }
         // Agora já pode setar novamente
@@ -279,7 +215,7 @@ class ImportarFornecedores extends CI_Controller
             $params = array(
                 $fornecedorBonERP_id
             );
-            $query = $this->db->query($sql, $params) or $this->exit_db_error();
+            $query = $this->dbbonerp->query($sql, $params) or $this->exit_db_error();
             $enderecos = $query->result_array();
             $enderecoId = null;
             if ($enderecos) {
@@ -293,33 +229,6 @@ class ImportarFornecedores extends CI_Controller
         }
         
         $this->salvarEndereco($fornecedorEkt, $fornecedorBonERP_id, $enderecoId);
-    }
-
-    public function findNovoCodigo($codigoEkt)
-    {
-        $query = $this->db->get_where('est_fornecedor', array(
-            'codigo' => $codigoEkt
-        )) or $this->exit_db_error();
-        if (count($query->result_array()) == 0) {
-            return $codigoEkt;
-        }
-        
-        $codigoStr = null;
-        // codigo tem 9 dígitos (999999001)
-        for ($f = 6; $f > 0; $f --) {
-            $codigoStr = str_pad('', $f, "9", STR_PAD_LEFT) . str_pad($codigoEkt, (9 - $f), "0", STR_PAD_LEFT);
-            
-            $query = $this->db->get_where('est_fornecedor', array(
-                'codigo' => $codigoStr
-            )) or $this->exit_db_error();
-            $existe = $query->result_array();
-            
-            if (count($existe) == 0) {
-                return $codigoStr;
-            }
-        }
-        
-        die('Nenhum código (999999001) disponível para ' . $codigoEkt);
     }
 
     /**
@@ -343,7 +252,7 @@ class ImportarFornecedores extends CI_Controller
         $endereco['updated'] = date("Y-m-d H:i:s");
         
         if ($enderecoId) {
-            $this->db->update('bon_endereco', $endereco, array(
+            $this->dbbonerp->update('bon_endereco', $endereco, array(
                 'id' => $enderecoId
             )) or $this->exit_db_error();
         } else {
@@ -353,13 +262,13 @@ class ImportarFornecedores extends CI_Controller
             $endereco['user_inserted_id'] = 1;
             $endereco['user_updated_id'] = 1;
             
-            $this->db->insert('bon_endereco', $endereco) or $this->exit_db_error();
+            $this->dbbonerp->insert('bon_endereco', $endereco) or $this->exit_db_error();
             
-            $enderecoId = $this->db->insert_id();
+            $enderecoId = $this->dbbonerp->insert_id();
         }
         
         // many-to-many
-        $query = $this->db->get_where("est_fornecedor_enderecos", array(
+        $query = $this->dbbonerp->get_where("est_fornecedor_enderecos", array(
             'est_fornecedor_id' => $fornecedorId,
             'bon_endereco_id' => $enderecoId
         )) or $this->exit_db_error();
@@ -368,7 +277,7 @@ class ImportarFornecedores extends CI_Controller
         if (count($r) == 0) {
             $est_fornecedor_enderecos['est_fornecedor_id'] = $fornecedorId;
             $est_fornecedor_enderecos['bon_endereco_id'] = $enderecoId;
-            $this->db->insert('est_fornecedor_enderecos', $est_fornecedor_enderecos) or $this->exit_db_error();
+            $this->dbbonerp->insert('est_fornecedor_enderecos', $est_fornecedor_enderecos) or $this->exit_db_error();
         }
     }
 
@@ -381,8 +290,9 @@ class ImportarFornecedores extends CI_Controller
      */
     private function salvarNaDePara($fornecedorBonERP, $fornecedorEkt)
     {
-        echo "LIDANDO COM 'depara'... \n";
+        $corrigiu_algo_aqui = false;
         $fornecedorId = $fornecedorBonERP['id'];
+        echo "LIDANDO COM 'depara' [$fornecedorId]... \n";
         
         $sql = "SELECT * FROM est_fornecedor_codektmesano WHERE fornecedor_id = ? AND mesano = ? AND codigo_ekt = ?";
         $params = array(
@@ -390,14 +300,16 @@ class ImportarFornecedores extends CI_Controller
             $this->mesano,
             $fornecedorEkt['CODIGO']
         );
-        $r = $this->db->query($sql, $params)->result_array();
+        $r = $this->dbbonerp->query($sql, $params)->result_array();
         
-        if (count($r) > 0) {} else {
+        // Se ainda não tem na est_fornecedor_codektmesano, insere...
+        if (count($r) == 0) {
             $codektmesano['fornecedor_id'] = $fornecedorId;
             $codektmesano['mesano'] = $this->mesano;
             $codektmesano['codigo_ekt'] = $fornecedorEkt['CODIGO'];
             
-            $this->db->insert('est_fornecedor_codektmesano', $codektmesano);
+            $this->dbbonerp->insert('est_fornecedor_codektmesano', $codektmesano) or $this->exit_db_error("Erro ao inserir na depara. fornecedor id [" . $fornecedorId . "]");
+            $corrigiu_algo_aqui = true;
         }
         
         // verifica se o mesano é menor que o codigo_ekt_desde
@@ -407,7 +319,10 @@ class ImportarFornecedores extends CI_Controller
             $dt_cod_ekt_desde->setTime(0, 0, 0, 0);
             if ($this->dtMesano < $dt_cod_ekt_desde) {
                 $fornecedorBonERP['codigo_ekt_desde'] = $this->dtMesano->format('Y-m-d');
-                $this->db->update('est_fornecedor', $fornecedorBonERP, array('id' => $fornecedorBonERP['id'])) or die("Erro ao atualizar 'codigo_ekt_desde'");
+                $this->dbbonerp->update('est_fornecedor', $fornecedorBonERP, array(
+                    'id' => $fornecedorBonERP['id']
+                )) or $this->exit_db_error("Erro ao atualizar 'codigo_ekt_desde'");
+                $corrigiu_algo_aqui = true;
             }
         }
         
@@ -418,102 +333,132 @@ class ImportarFornecedores extends CI_Controller
             $dt_cod_ekt_ate->setTime(0, 0, 0, 0);
             if ($this->dtMesano > $dt_cod_ekt_ate) {
                 $fornecedorBonERP['codigo_ekt_ate'] = $this->dtMesano->format('Y-m-d');
-                $this->db->update('est_fornecedor', $fornecedorBonERP, array('id' => $fornecedorBonERP['id'])) or die("Erro ao atualizar 'codigo_ekt_ate'");
+                $this->dbbonerp->update('est_fornecedor', $fornecedorBonERP, array(
+                    'id' => $fornecedorBonERP['id']
+                )) or $this->exit_db_error("Erro ao atualizar 'codigo_ekt_ate'");
+                $corrigiu_algo_aqui = true;
             }
         }
         
-        echo "OK.\n\n";
+        if ($corrigiu_algo_aqui) {
+            $this->acertados_depara ++;
+        }
+    }
+
+    public function findNovoCodigo($codigoEkt)
+    {
+        $query = $this->dbbonerp->get_where('est_fornecedor', array(
+            'codigo' => $codigoEkt
+        )) or $this->exit_db_error();
+        if (count($query->result_array()) == 0) {
+            return $codigoEkt;
+        }
+        
+        $codigoStr = null;
+        // codigo tem 9 dígitos (999999001)
+        while (true) {
+            $prefix = rand(1, 99999);
+            $codigoStr = str_pad($prefix, 5, "9", STR_PAD_LEFT) . "0" . $codigoEkt;
+            $query = $this->dbbonerp->get_where('est_fornecedor', array(
+                'codigo' => $codigoStr
+            )) or $this->exit_db_error("Erro ao buscar código randômico.");
+            $existe = $query->result_array();
+            if (count($existe) == 0) {
+                return $codigoStr;
+            }
+        }
     }
 
     /**
+     * Verifica se é o mesmo fornecedor comparando os nomes fantasias.
      *
      * @param
      *            $fornecedorBonERP
      * @param
      *            $fornecedorEkt
+     * @return boolean
      */
-    private function salvarNaDePara_old($fornecedorBonERP, $fornecedorEkt)
+    private function checkMesmoNomeFantasia($fornecedorBonERP, $fornecedorEkt)
     {
-        echo "LIDANDO COM a 'depara'... \n";
-        $fornecedorId = $fornecedorBonERP['id'];
+        $nomeFantasiaBonERP = preg_replace("[^A-Za-z]", "", $fornecedorBonERP['nome_fantasia']);
+        $nomeFantasiaEkt = preg_replace("[^A-Za-z]", "", $fornecedorEkt['NOME_FANTASIA']);
         
-        $desde = DateTime::createFromFormat('Ymd', $fornecedorEkt['mesano'] . "01")->format('Y-m-d');
-        
-        // Verifica quantos registros existem com este codigo_ekt e 'ate' NULL
-        $codigoEkt = $fornecedorEkt['CODIGO'];
-        $sqlCheck = "SELECT id FROM est_fornecedor WHERE codigo_ekt_ate IS NULL AND codigo_ekt = ?";
-        $query = $this->db->query($sqlCheck, array(
-            $codigoEkt
-        )) or $this->exit_db_error();
-        $outros = $query->result_array();
-        
-        // não pode ter dois registros com mesmo codigo_ekt e ate=null
-        if (count($outros) > 1) {
-            die("ERRO NA BASE: Para o codigo_ekt " . $codigoEkt . " existe mais de um registro com ate=null");
-        }
-        // Se ainda não tinha o codigo_ekt na est_fornecedor_depara
-        if (count($outros) == 0) {
-            // Somente insere.
-            echo "Não tinha ainda... só INSERT.\n";
-            $sqlInsert = "UPDATE est_fornecedor SET codigo_ekt = ? , codigo_ekt_desde = ? WHERE id = ?";
-            $this->db->query($sqlInsert, array(
-                $fornecedorEkt['CODIGO'],
-                $desde,
-                $fornecedorId
-            )) or $this->exit_db_error();
+        if (strcasecmp($nomeFantasiaBonERP, $nomeFantasiaEkt) == 0) {
+            return true;
         } else {
-            
-            // Se já tinha o codigo_ekt na est_fornecedor_depara
-            echo "Já tinha este codigo_ekt... ";
-            
-            // Porém não é o mesmo 'fornecedor_id'...
-            if ($outros[0]['id'] != $fornecedorId) {
-                echo "mas não é o mesmo fornecedor_id... ATUALIZANDO o anterior... ";
-                // Atualizar o registro anterior marcando o 'ate'...
-                $sql = "UPDATE est_fornecedor SET codigo_ekt_ate = ? WHERE id = ?";
-                $ultimoDiaMesPassado = DateTime::createFromFormat('Ym', $fornecedorEkt['mesano'])->modify('-1 month')->format('Y-m-t');
-                $this->db->query($sql, array(
-                    $ultimoDiaMesPassado,
-                    $outros[0]['id']
-                )) or $this->exit_db_error();
-                // E insere um novo registro setando apenas o 'desde'.
-                echo "E inserindo um novo registro ... \n";
-                $sqlInsert = "UPDATE est_fornecedor SET codigo_ekt = ? , codigo_ekt_desde = ? WHERE id = ?";
-                $this->db->query($sqlInsert, array(
-                    $fornecedorEkt['CODIGO'],
-                    $desde,
-                    $fornecedorId
-                )) or $this->exit_db_error();
+            if ((strpos($nomeFantasiaBonERP, $nomeFantasiaEkt) !== false) || (strpos($nomeFantasiaEkt, $nomeFantasiaBonERP) !== false)) {
+                return true;
             }
+            return false;
         }
-        
-        echo "OK.\n\n";
     }
 
     /**
-     *
-     * @param type $codigoEkt
-     * @return type
      */
-    public function findFornecedoresAntigos($codigoEkt)
+    public function setar_codigos_ekt()
     {
-        $sql = "SELECT * FROM vw_est_fornecedor WHERE codigo LIKE ?";
-        $params = array(
-            '999%' . sprintf("%03d", $codigoEkt)
-        );
-        $query = $this->db->query($sql, $params) or $this->exit_db_error();
-        return $query->result_array();
+        $time_start = microtime(true);
+        $this->dbbonerp->trans_start();
+        
+        $sql = "SELECT * FROM ekt_fornecedor WHERE nome_fantasia IS NOT NULL AND trim(nome_fantasia) != '' ORDER BY id";
+        $query = $this->dbekt->query($sql) or $this->exit_db_error();
+        $result = $query->result_array();
+        
+        echo "<pre>";
+        
+        $i = 0;
+        foreach ($result as $fornecedorEkt) {
+            
+            $nome = $fornecedorEkt['NOME_FANTASIA'];
+            $nome = preg_replace("( )", "", $nome);
+            echo "\n\n" . str_pad("", 150, "-") . " " . ++ $i . "\n";
+            echo "INICIANDO... " . $nome . "\n";
+            
+            if (! $nome) {
+                echo "Sem nome (código: " . $fornecedorEkt['CODIGO'] . ")\n\n";
+                continue;
+            }
+            
+            $query = $this->dbbonerp->query("SELECT * FROM vw_est_fornecedor WHERE REPLACE(nome_fantasia,' ','') LIKE ? AND tipo = 'ESTOQUE'", array(
+                $nome
+            )) or $this->exit_db_error();
+            $r = $query->result_array();
+            
+            if (count($r) > 1) {
+                echo "\n\n" . str_pad("", 150, "%") . "\n";
+                echo "Mais de um encontrado: " . $nome;
+                echo "\n\n" . str_pad("", 150, "%") . "\n";
+                continue;
+            } else {
+                if (count($r) == 1) {
+                    echo "Somente um encontrado.\n";
+                    $fornecedorBonERP = $r[0];
+                    echo "OK\nSalvando na depara...";
+                    $this->salvarNaDePara($fornecedorBonERP, $fornecedorEkt);
+                    echo "OK.";
+                } else {
+                    echo "NENHUM ENCONTRADO... salvando...\n\n";
+                    $this->salvarFornecedor($fornecedorEkt);
+                }
+            }
+        }
+        
+        echo "FINALIZANDO.\n\n";
+        
+        $this->dbbonerp->trans_complete();
+        
+        $time_end = microtime(true);
+        $execution_time = ($time_end - $time_start);
+        echo "\n\n\n\n----------------------------------\nTotal Execution Time: " . $execution_time . "s";
     }
 
-    private function exit_db_error()
+    private function exit_db_error($msg = null)
     {
         echo str_pad("", 100, "*") . "\n";
-        echo "LAST QUERY: " . $this->db->last_query() . "\n\n";
-        print_r($this->db->error());
-        echo str_pad("", 100, "*") . "\n";
+        echo $msg ? $msg . PHP_EOL : '';
+        echo "LAST QUERY: " . $this->dbbonerp->last_query() . PHP_EOL . PHP_EOL;
+        print_r($this->dbbonerp->error()) . PHP_EOL . PHP_EOL;
+        echo str_pad("", 100, "*") . PHP_EOL;
         exit();
     }
-
-    public function teste()
-    {}
 }
