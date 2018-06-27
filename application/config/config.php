@@ -24,7 +24,7 @@ defined('BASEPATH') OR exit('No direct script access allowed');
   | a PHP script and you can easily do that on your own.
   |
  */
-$domain = 'localhost/crosier';
+$domain = 'localhost/ekt2bonerp';
 if (!empty($_SERVER['HTTPS'])) {
     $config['base_url'] = 'https://' . $domain;
 } else {
