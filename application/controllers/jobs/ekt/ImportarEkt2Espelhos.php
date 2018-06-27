@@ -391,6 +391,8 @@ class ImportarEkt2Espelhos extends CI_Controller
             $campos = explode(";", $linha);
             if (count($campos) < 23) {
                 die("A linha deve ter 23 campos. LINHA: [" + $linha + "]");
+            } else {
+                echo "Importando linha [" . $linha . "]" . PHP_EOL;
             }
             
             $ektFornecedor = array();
@@ -431,7 +433,10 @@ class ImportarEkt2Espelhos extends CI_Controller
             
             $this->handleIudtUserInfo($ektFornecedor);
             
+            echo "Inserindo..." . PHP_EOL;
+            
             if (! $this->dbekt->insert('ekt_fornecedor', $ektFornecedor)) {
+                echo "Erro ao inserir o fornecedor."  . PHP_EOL;
                 log_message('error', 'Erro ao salvar o ektFornecedor');
                 return;
             } else {
