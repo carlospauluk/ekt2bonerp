@@ -455,7 +455,9 @@ class ImportarProdutos extends CI_Controller
     {
         $ordemStr = str_pad($ordem, 2, '0', STR_PAD_LEFT);
         
-        if ($ektProduto['QT' . $ordemStr]) {
+        $qtde = (double) $ektProduto['QT' . $ordemStr];
+        
+        if ($qtde != 0.0) {
             echo ">>>>>>>>>>>>>>>>> handleProdutoSaldo - " . $ordem . PHP_EOL;
             
             $qryGt = $this->dbbonerp->query("SELECT gt.id FROM est_grade_tamanho gt, est_grade g WHERE gt.grade_id = g.id AND g.codigo = ? AND gt.ordem = ?", array(
