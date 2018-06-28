@@ -113,22 +113,22 @@ class Base_model extends \CI_Model
             $this->db->trans_start();
             
             // Se passou o id, então é para UPDATE
-            if ($data['id']) {
+            if (array_key_exists('id', $data) and $data['id']) {
                 $this->db->where('id', $data['id']);
                 $ret = $this->db->update($this->table, $data);
                 
                 if ($ret) {
                     $this->db->trans_complete();
                     if ($this->db->trans_status() === FALSE) {
-                        throw new Exception('Erro ao finalizar transação do UPDATE.');
+                        throw new \Exception('Erro ao finalizar transação do UPDATE.');
                     } else {
                         return $data['id'];
                     }
                 } else {
-                    throw new Exception('Erro ao realizar o UPDATE.');
+                    throw new \Exception('Erro ao realizar o UPDATE.');
                 }
             } else { // Se não passou id, é para INSERT
-                $data['id'] = null;
+                unset($data['id']); // = null;
                 $data['inserted'] = $data['updated'];
                 $ret = $this->db->insert($this->table, $data);
                 if ($ret) {
@@ -137,18 +137,18 @@ class Base_model extends \CI_Model
                     $last_id = $row['last_id'];
                     $this->db->trans_complete();
                     if ($this->db->trans_status() === FALSE) {
-                        throw new Exception('Erro ao finalizar transação do INSERT.');
+                        throw new \Exception('Erro ao finalizar transação do INSERT.');
                     } else {
                         return $last_id;
                     }
                 } else {
-                    throw new Exception('Erro ao realizar o INSERT.');
+                    throw new \Exception('Erro ao realizar o INSERT.');
                 }
             }
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             log_message('error', $e->getMessage());
             log_message('error', $this->db->error()['message']);
-            throw new Exception('Erro ao salvar o registro.', null, $e);
+            throw new \Exception('Erro ao salvar o registro.', null, $e);
         }
     }
 

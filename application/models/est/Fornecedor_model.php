@@ -12,7 +12,31 @@ class Fornecedor_model extends CIBases\Models\DAO\Base\Base_model
         parent::__construct("est_fornecedor", "bonerp");
     }
 
-    public function findByCodigoEkt($codigo, \DateTime $dtMesano)
+    public function findByCodigoEkt($codigo, $mesano)
+    {
+        $sql = "SELECT fornecedor_id FROM est_fornecedor_codektmesano WHERE codigo_ekt = ? AND mesano = ?";
+        
+        $params = array(
+            $codigo,
+            $mesano
+        );
+        
+        $qry = $this->db->query($sql, $params);
+        
+        $rs = $qry->result_array();
+        
+        if (count($rs) < 1) {
+            throw new \Exception("Nenhum fornecedor encontrado. Código: " . $codigo);
+        } else {
+            if (count($rs) > 1) {
+                throw new \Exception("Mais de um fornecedor encontrado. Código: " . $codigo);
+            } else {
+                return $rs[0]['fornecedor_id'];
+            }
+        }
+    }
+    
+    public function findByCodigoEkt_old($codigo, \DateTime $dtMesano)
     {
         
         

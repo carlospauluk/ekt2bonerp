@@ -97,13 +97,17 @@ class ImportarFornecedores extends CI_Controller
         
         echo PHP_EOL . PHP_EOL . PHP_EOL;
         echo "--------------------------------------------------------------" . PHP_EOL;
+        echo "--------------------------------------------------------------" . PHP_EOL;
+        echo "--------------------------------------------------------------" . PHP_EOL;
         echo "INSERIDOS: " . $this->inseridos . PHP_EOL;
         echo "ATUALIZADOS: " . $this->atualizados . PHP_EOL;
         echo "ACERTADOS DEPARA: " . $this->acertados_depara . PHP_EOL;
         
         $time_end = microtime(true);
         $execution_time = ($time_end - $time_start);
-        echo "\n\n\n\n----------------------------------\nTotal Execution Time: " . $execution_time . "s";
+        echo PHP_EOL . PHP_EOL . PHP_EOL;
+        echo "----------------------------------" . PHP_EOL;
+        echo "Total Execution Time: " . $execution_time . "s" . PHP_EOL . PHP_EOL . PHP_EOL;
     }
 
     /**
