@@ -462,11 +462,12 @@ class ImportarProdutos extends CI_Controller
                 $ektProduto['GRADE'],
                 $ordem
             ))->result_array();
+            
+            if (count($qryGt) != 1) {
+                die("Erro ao pesquisar grade. Reduzido: [" . $ektProduto['REDUZIDO'] . "]. Código: [" . $ektProduto['GRADE'] . "]. Ordem: [" . $ordem . "]");
+            }
             $gt = $qryGt[0];
             
-            if ($gt == null) {
-                die("GradeTamanho null: " . $ordem);
-            }
             
             $produtoSaldo['produto_id'] = $produto['id'];
             $produtoSaldo['grade_tamanho_id'] = $gt['id'];
