@@ -131,6 +131,7 @@ class ImportarProdutos extends CI_Controller
             if (! $this->dtMesano instanceof DateTime) {
                 die("mesano inválido." . PHP_EOL . PHP_EOL . PHP_EOL);
             }
+            $this->dtMesano->setTime(0,0,0,0);
             echo 'LIMPANDO A est_produto_saldo...' . PHP_EOL;
             $this->deletarSaldos();
             echo "OK!!!" . PHP_EOL . PHP_EOL;
