@@ -977,6 +977,7 @@ class ImportarProdutos extends CI_Controller
 
     public function handleRegistroConferencia($descricao, $dtMesano, $valor)
     {
+        echo "handleRegistroConferencia - [" . $descricao . "]" . PHP_EOL; 
         $params = array(
             $descricao,
             $dtMesano
@@ -992,6 +993,7 @@ class ImportarProdutos extends CI_Controller
         $model = new \CIBases\Models\DAO\Base\Base_model('fin_reg_conf', 'bonerp');
         $model->setDb($this->dbbonerp);
         $model->save($reg);
+        echo "OK!!!" . PHP_EOL;
     }
 
     private function exit_db_error($msg = null)
