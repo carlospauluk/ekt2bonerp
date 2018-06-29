@@ -164,7 +164,7 @@ class ImportarProdutos extends CI_Controller
         
         $l = $this->ektproduto_model->findByMesano($this->mesano);
         
-//         $l = $this->dbekt->query("SELECT * FROM ekt_produto WHERE reduzido = 7548 AND mesano = ?", array($this->mesano))->result_array();
+        // $l = $this->dbekt->query("SELECT * FROM ekt_produto WHERE reduzido = 7548 AND mesano = ?", array($this->mesano))->result_array();
         
         $total = count($l);
         echo " >>>>>>>>>>>>>>>>>>>> " . $total . " produto(s) encontrado(s)." . PHP_EOL;
@@ -939,25 +939,59 @@ class ImportarProdutos extends CI_Controller
             $this->dbbonerp->insert('est_produto_saldo_historico', $produtoSaldo) or $this->exit_db_error("Erro ao inserir na est_produto_reduzidoektmesano. produto id [" . $produtoId . "]");
         }
         
+        $qry = $this->dbbonerp->query("CALL sp_total_inventario(?,@a,@b,@c)", array(
+            $mesano
+        )) or die("Query fail: " . PHP_EOL . PHP_EOL . PHP_EOL);
+        $result = $qry->result_array();
+        mysqli_next_result($this->dbbonerp->conn_id);
+        $qry->free_result(); 
+        
+        if (count($result) == 1) {
+            $totalCustos = $result[0]['total_custo'];
+            $totalPrecosPrazo = $result[0]['total_precos_prazo'];
+            $totalPecas = $result[0]['total_pecas'];
+            
+            echo "--------------------------------------------------------------" . PHP_EOL;
+            echo "Total Custo: " . $totalCustos . PHP_EOL;
+            echo "Total Venda: " . $totalPrecosPrazo . PHP_EOL;
+            echo "Total Pecas: " . $totalPecas . PHP_EOL;
+            echo "--------------------------------------------------------------" . PHP_EOL . PHP_EOL;
+            
+            
+            
+            $this->handleRegistroConferencia("INVENT PECAS (IMPORTADO)", $this->dtMesano->format('Y-m-t'), $totalPecas);
+            $this->handleRegistroConferencia("INVENT CUSTO (IMPORTADO)", $this->dtMesano->format('Y-m-t'), $totalCustos);
+            $this->handleRegistroConferencia("INVENT VENDA (IMPORTADO)", $this->dtMesano->format('Y-m-t'), $totalPrecosPrazo);
+        }
+        
         echo "Finalizando... commitando a transação..." . PHP_EOL;
         
         $this->dbbonerp->trans_complete();
-        
-        $result = $this->dbbonerp->query("CALL sp_total_inventario(?,@a,@b,@c)", array($mesano))->result_array() or die("Query fail: " . PHP_EOL . PHP_EOL . PHP_EOL);
-        
-        if (count($result) == 1) {
-            echo "--------------------------------------------------------------" . PHP_EOL;
-            echo "Total Custo: " . $result[0]['total_custo'] . PHP_EOL;
-            echo "Total Venda: " . $result[0]['total_precos_prazo'] . PHP_EOL;
-            echo "Total Pecas: " . $result[0]['total_pecas'] . PHP_EOL;
-            echo "--------------------------------------------------------------" . PHP_EOL . PHP_EOL;
-        }
         
         $time_end = microtime(true);
         $execution_time = ($time_end - $time_start);
         echo PHP_EOL . PHP_EOL . PHP_EOL;
         echo "----------------------------------" . PHP_EOL;
         echo "Total Execution Time: " . $execution_time . "s" . PHP_EOL . PHP_EOL . PHP_EOL;
+    }
+
+    public function handleRegistroConferencia($descricao, $dtMesano, $valor)
+    {
+        $params = array(
+            $descricao,
+            $dtMesano
+        );
+        $r = $this->dbbonerp->query("SELECT id FROM fin_reg_conf WHERE descricao = ? AND dt_registro = ?", $params)->result_array();
+        
+        $reg['descricao'] = $descricao;
+        $reg['dt_registro'] = $dtMesano;
+        
+        if (count($r) == 1) {
+            $reg['id'] = $r[0]['id'];
+        }
+        $model = new \CIBases\Models\DAO\Base\Base_model('fin_reg_conf', 'bonerp');
+        $model->setDb($this->dbbonerp);
+        $model->save($reg);
     }
 
     private function exit_db_error($msg = null)
