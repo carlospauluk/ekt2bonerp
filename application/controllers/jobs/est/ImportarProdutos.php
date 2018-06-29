@@ -659,8 +659,7 @@ class ImportarProdutos extends CI_Controller
                 $this->deptos[$depto['codigo']] = $depto['id'];
             }
         }
-        // Se não achar, retorna o 999999 (ERRO DE IMPORTAÇÃO)
-        return $this->deptos[$codigo] ? $this->deptos[$codigo] : $this->deptos['999999'];
+        return $this->deptos[$codigo] ? $this->deptos[$codigo] : $this->deptos['0'];
     }
 
     private $subdeptos;
@@ -675,7 +674,6 @@ class ImportarProdutos extends CI_Controller
                 $this->subdeptos[$subdepto['codigo']] = $subdepto['id'];
             }
         }
-        // Se não achar, retorna o 999999 (ERRO DE IMPORTAÇÃO)
         if ($this->subdeptos[$codigo]) {
             return $this->subdeptos[$codigo];
         } else {
