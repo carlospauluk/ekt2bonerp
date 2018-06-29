@@ -904,7 +904,7 @@ class ImportarProdutos extends CI_Controller
         FROM
         ekt_produto
         WHERE
-        mesano = ?
+        mesano = ? AND REDUZIDO != 88888
         ORDER BY reduzido", array(
             $mesano
         ))->result_array();
