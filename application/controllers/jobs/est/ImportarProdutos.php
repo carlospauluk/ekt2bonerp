@@ -877,7 +877,6 @@ class ImportarProdutos extends CI_Controller
         
         $this->dbbonerp->trans_start();
         
-        
         $this->mesano = $mesano;
         $this->dtMesano = DateTime::createFromFormat('Ymd', $mesano . "01");
         if (! $this->dtMesano instanceof DateTime) {
@@ -905,7 +904,9 @@ class ImportarProdutos extends CI_Controller
         $total = count($ekts);
         $i = 0;
         
-        $r_prods = $this->dbbonerp->query("SELECT reduzido_ekt, produto_id FROM est_produto_reduzidoektmesano WHERE mesano = ?", array($mesano))->result_array();
+        $r_prods = $this->dbbonerp->query("SELECT reduzido_ekt, produto_id FROM est_produto_reduzidoektmesano WHERE mesano = ?", array(
+            $mesano
+        ))->result_array();
         
         if (count($r_prods) != $total) {
             die("qtde de produtos diferem");
@@ -916,15 +917,10 @@ class ImportarProdutos extends CI_Controller
             $prods[$prod['reduzido_ekt']] = $prod['produto_id'];
         }
         
-        
-        
         foreach ($ekts as $ekt) {
             echo " >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> " . ++ $i . "/" . $total . PHP_EOL;
             
-            
             $produto_id = $prods[$ekt['REDUZIDO']];
-            
-            
             
             $produtoSaldo['produto_id'] = $produto_id;
             $produtoSaldo['saldo_mes'] = $ekt['qtde_total'];
@@ -942,6 +938,16 @@ class ImportarProdutos extends CI_Controller
         echo "Finalizando... commitando a transação..." . PHP_EOL;
         
         $this->dbbonerp->trans_complete();
+        
+        $result = $this->dbbonerp->query("CALL sp_total_inventario(?,@a,@b,@c)", array($mesano))->result_array() or die("Query fail: ");
+        
+        if (count($result) == 1) {
+            echo "--------------------------------------------------------------" . PHP_EOL;
+            echo "Total Custo: " . $result[0]['total_custo'] . PHP_EOL;
+            echo "Total Venda: " . $result[0]['total_precos_prazo'] . PHP_EOL;
+            echo "Total Pecas: " . $result[0]['total_pecas'] . PHP_EOL;
+            echo "--------------------------------------------------------------" . PHP_EOL . PHP_EOL;
+        }
         
         $time_end = microtime(true);
         $execution_time = ($time_end - $time_start);
