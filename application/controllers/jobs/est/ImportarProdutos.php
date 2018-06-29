@@ -470,7 +470,6 @@ class ImportarProdutos extends CI_Controller
             }
             $gt = $qryGt[0];
             
-            
             $produtoSaldo['produto_id'] = $produto['id'];
             $produtoSaldo['grade_tamanho_id'] = $gt['id'];
             $produtoSaldo['qtde'] = $ektProduto['QT' . $ordemStr] + $acumulado;
@@ -872,6 +871,85 @@ class ImportarProdutos extends CI_Controller
         }
     }
 
+    public function gerarProdutoSaldoHistorico($mesano)
+    {
+        $time_start = microtime(true);
+        
+        $this->dbbonerp->trans_start();
+        
+        
+        $this->mesano = $mesano;
+        $this->dtMesano = DateTime::createFromFormat('Ymd', $mesano . "01");
+        if (! $this->dtMesano instanceof DateTime) {
+            die("mesano inválido.\n\n\n");
+        }
+        
+        echo "Iniciando gerarProdutoSaldoHistorico() para mesano = '" . $mesano . "'" . PHP_EOL . PHP_EOL;
+        
+        $this->dbbonerp->query("DELETE FROM est_produto_saldo_historico WHERE DATE_FORMAT(mesano, '%Y%m') = ?", array(
+            $mesano
+        ));
+        
+        $ekts = $this->dbekt->query("SELECT
+        REDUZIDO,
+        coalesce(qt01,0)+coalesce(qt02,0)+coalesce(qt03,0)+coalesce(qt04,0)+coalesce(qt05,0)+coalesce(qt06,0)+
+        coalesce(qt07,0)+coalesce(qt08,0)+coalesce(qt09,0)+coalesce(qt10,0)+coalesce(qt11,0)+coalesce(qt12,0) as qtde_total
+        FROM
+        ekt_produto
+        WHERE
+        mesano = ?
+        ORDER BY reduzido", array(
+            $mesano
+        ))->result_array();
+        
+        $total = count($ekts);
+        $i = 0;
+        
+        $r_prods = $this->dbbonerp->query("SELECT reduzido_ekt, produto_id FROM est_produto_reduzidoektmesano WHERE mesano = ?", array($mesano))->result_array();
+        
+        if (count($r_prods) != $total) {
+            die("qtde de produtos diferem");
+        }
+        
+        $prods = array();
+        foreach ($r_prods as $prod) {
+            $prods[$prod['reduzido_ekt']] = $prod['produto_id'];
+        }
+        
+        
+        
+        foreach ($ekts as $ekt) {
+            echo " >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> " . ++ $i . "/" . $total . PHP_EOL;
+            
+            
+            $produto_id = $prods[$ekt['REDUZIDO']];
+            
+            
+            
+            $produtoSaldo['produto_id'] = $produto_id;
+            $produtoSaldo['saldo_mes'] = $ekt['qtde_total'];
+            $produtoSaldo['mesano'] = $this->dtMesano->format('Y-m-d H:i:s');
+            
+            $produtoSaldo['updated'] = $this->agora->format('Y-m-d H:i:s');
+            $produtoSaldo['inserted'] = $this->agora->format('Y-m-d H:i:s');
+            $produtoSaldo['estabelecimento_id'] = 1;
+            $produtoSaldo['user_inserted_id'] = 1;
+            $produtoSaldo['user_updated_id'] = 1;
+            
+            $this->dbbonerp->insert('est_produto_saldo_historico', $produtoSaldo) or $this->exit_db_error("Erro ao inserir na est_produto_reduzidoektmesano. produto id [" . $produtoId . "]");
+        }
+        
+        echo "Finalizando... commitando a transação..." . PHP_EOL;
+        
+        $this->dbbonerp->trans_complete();
+        
+        $time_end = microtime(true);
+        $execution_time = ($time_end - $time_start);
+        echo PHP_EOL . PHP_EOL . PHP_EOL;
+        echo "----------------------------------" . PHP_EOL;
+        echo "Total Execution Time: " . $execution_time . "s" . PHP_EOL . PHP_EOL . PHP_EOL;
+    }
+
     private function exit_db_error($msg = null)
     {
         echo str_pad("", 100, "*") . "\n";
@@ -892,6 +970,8 @@ class ImportarProdutos extends CI_Controller
     {
         $time_start = microtime(true);
         
+        echo "Iniciando a correção de reduzidos..." . PHP_EOL;
+        
         $this->dbbonerp->trans_start();
         
         $r = $this->dbbonerp->query("SELECT id, reduzido, reduzido_ekt FROM est_produto")->result_array();
@@ -901,7 +981,8 @@ class ImportarProdutos extends CI_Controller
             echo " >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> " . ++ $i . "/" . $total . PHP_EOL;
             $reduzido = $produto['reduzido'];
             if ($reduzido != 88888) {
-                if ($reduzido[0] == 9) continue;
+                if ($reduzido[0] == 9)
+                    continue;
                 
                 $novo = substr($reduzido, 0, 4) . "00000" . str_pad($produto['reduzido_ekt'], 5, '0', STR_PAD_LEFT);
                 if ($novo != $reduzido) {
@@ -917,9 +998,7 @@ class ImportarProdutos extends CI_Controller
                         }
                     }
                     
-                    
                     $produto['reduzido'] = $novo;
-                    
                     
                     $this->dbbonerp->update('est_produto', $produto, array(
                         'id' => $produto['id']
@@ -927,7 +1006,6 @@ class ImportarProdutos extends CI_Controller
                 }
             }
         }
-        
         echo "Finalizando... commitando a transação..." . PHP_EOL;
         
         $this->dbbonerp->trans_complete();
