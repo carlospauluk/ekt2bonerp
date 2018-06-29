@@ -164,7 +164,7 @@ class ImportarProdutos extends CI_Controller
         
         $l = $this->ektproduto_model->findByMesano($this->mesano);
         
-        // $l = $this->dbekt->query("SELECT * FROM ekt_produto WHERE reduzido = 7548 AND mesano = ?", array($this->mesano))->result_array();
+        // $l = $this->dbekt->query("SELECT * FROM ekt_produto WHERE reduzido = 4521 AND mesano = ?", array($this->mesano))->result_array();
         
         $total = count($l);
         echo " >>>>>>>>>>>>>>>>>>>> " . $total . " produto(s) encontrado(s)." . PHP_EOL;
@@ -214,7 +214,10 @@ class ImportarProdutos extends CI_Controller
                     echo "Achou o mesmo. Atualizando..." . PHP_EOL;
                     $achouMesmo = true;
                     $this->saveProduto($ektProduto, $mesmoReduzido);
+                    $mesmoReduzido = $this->produto_model->findby_id($mesmoReduzido['id']); // recarrego para pegar oq foi alterado
+                    
                     $this->saveGrade($ektProduto, $mesmoReduzido);
+                    // $mesmoReduzido = $this->produto_model->findby_id($mesmoReduzido['id']);
                     
                     // conferindo se as qtdes na grade batem
                     $qtdeTotal_ektProduto = $this->getQtdeTotalEktProduto($ektProduto);
@@ -942,7 +945,7 @@ class ImportarProdutos extends CI_Controller
         )) or die("Query fail: " . PHP_EOL . PHP_EOL . PHP_EOL);
         $result = $qry->result_array();
         mysqli_next_result($this->dbbonerp->conn_id);
-        $qry->free_result(); 
+        $qry->free_result();
         
         if (count($result) == 1) {
             $totalCustos = $result[0]['total_custo'];
@@ -954,8 +957,6 @@ class ImportarProdutos extends CI_Controller
             echo "Total Venda: " . $totalPrecosPrazo . PHP_EOL;
             echo "Total Pecas: " . $totalPecas . PHP_EOL;
             echo "--------------------------------------------------------------" . PHP_EOL . PHP_EOL;
-            
-            
             
             $this->handleRegistroConferencia("INVENT PECAS (IMPORTADO)", $this->dtMesano->format('Y-m-t'), $totalPecas);
             $this->handleRegistroConferencia("INVENT CUSTO (IMPORTADO)", $this->dtMesano->format('Y-m-t'), $totalCustos);
@@ -975,7 +976,7 @@ class ImportarProdutos extends CI_Controller
 
     public function handleRegistroConferencia($descricao, $dtMesano, $valor)
     {
-        echo "handleRegistroConferencia - [" . $descricao . "]" . PHP_EOL; 
+        echo "handleRegistroConferencia - [" . $descricao . "]" . PHP_EOL;
         $params = array(
             $descricao,
             $dtMesano
