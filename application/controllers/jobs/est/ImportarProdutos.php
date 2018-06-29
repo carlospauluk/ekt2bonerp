@@ -171,6 +171,9 @@ class ImportarProdutos extends CI_Controller
         
         $i = 0;
         foreach ($l as $ektProduto) {
+            if ($ektProduto['REDUZIDO'] == 88888) {
+                continue;
+            }
             echo " >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> " . ++ $i . "/" . $total . PHP_EOL;
             $this->importarProduto($ektProduto);
         }
