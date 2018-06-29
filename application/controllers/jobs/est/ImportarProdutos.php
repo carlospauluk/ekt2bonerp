@@ -986,6 +986,7 @@ class ImportarProdutos extends CI_Controller
         
         $reg['descricao'] = $descricao;
         $reg['dt_registro'] = $dtMesano;
+        $reg['valor'] = $valor;
         
         if (count($r) == 1) {
             $reg['id'] = $r[0]['id'];
