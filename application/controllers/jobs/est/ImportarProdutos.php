@@ -533,7 +533,7 @@ class ImportarProdutos extends CI_Controller
             $dt_ekt_ate->setTime(0, 0, 0, 0);
             if ($this->dtMesano > $dt_ekt_ate) {
                 $produtoBonERP['reduzido_ekt_ate'] = $this->dtMesano->format('Y-m-d');
-                $this->dbbonerp->update('est_fornecedor', $produtoBonERP, array(
+                $this->dbbonerp->update('est_produto', $produtoBonERP, array(
                     'id' => $produtoId
                 )) or $this->exit_db_error("Erro ao atualizar 'reduzido_ekt_ate'");
                 $corrigiu_algo_aqui = true;
