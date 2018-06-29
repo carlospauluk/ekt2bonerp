@@ -116,8 +116,8 @@ class ImportarProdutos extends CI_Controller
         
         echo PHP_EOL . PHP_EOL;
         
-        $this->csvsPath = getenv('EKT_CSVS_PATH') or die("EKT_CSVS_PATH não informado\n\n\n");
-        $this->logPath = getenv('EKT_LOG_PATH') or die("EKT_LOG_PATH não informado\n\n\n");
+        $this->csvsPath = getenv('EKT_CSVS_PATH') or die("EKT_CSVS_PATH não informado" . PHP_EOL . PHP_EOL . PHP_EOL);
+        $this->logPath = getenv('EKT_LOG_PATH') or die("EKT_LOG_PATH não informado" . PHP_EOL . PHP_EOL . PHP_EOL);
         
         echo "csvsPath: [" . $this->csvsPath . "]" . PHP_EOL;
         echo "logPath: [" . $this->logPath . "]" . PHP_EOL;
@@ -129,7 +129,7 @@ class ImportarProdutos extends CI_Controller
             $this->mesano = $mesano;
             $this->dtMesano = DateTime::createFromFormat('Ymd', $mesano . "01");
             if (! $this->dtMesano instanceof DateTime) {
-                die("mesano inválido.\n\n\n");
+                die("mesano inválido." . PHP_EOL . PHP_EOL . PHP_EOL);
             }
             echo 'LIMPANDO A est_produto_saldo...' . PHP_EOL;
             $this->deletarSaldos();
@@ -163,6 +163,8 @@ class ImportarProdutos extends CI_Controller
         $this->dbbonerp->trans_start();
         
         $l = $this->ektproduto_model->findByMesano($this->mesano);
+        
+//         $l = $this->dbekt->query("SELECT * FROM ekt_produto WHERE reduzido = 7548 AND mesano = ?", array($this->mesano))->result_array();
         
         $total = count($l);
         echo " >>>>>>>>>>>>>>>>>>>> " . $total . " produto(s) encontrado(s)." . PHP_EOL;
@@ -218,7 +220,7 @@ class ImportarProdutos extends CI_Controller
                     $qtdeTotal_ektProduto = $this->getQtdeTotalEktProduto($ektProduto);
                     $qtdeTotal_produto = $this->getQtdeTotalProduto($mesmoReduzido);
                     if ($qtdeTotal_ektProduto != $qtdeTotal_produto) {
-                        die("Qtde diferem para produtoId=[" . $mesmoReduzido['id'] . "] Reduzido:[" . $ektProduto['REDUZIDO'] . "]");
+                        die("Qtde diferem para produtoId=[" . $mesmoReduzido['id'] . "] Reduzido:[" . $ektProduto['REDUZIDO'] . "]" . PHP_EOL . PHP_EOL . PHP_EOL);
                     }
                     
                     $this->acertaPeriodosReduzidoEKT($mesmoReduzido);
@@ -254,7 +256,7 @@ class ImportarProdutos extends CI_Controller
             $reduzid_bonerp = substr($produto['reduzido'], strlen($produto['reduzido']) - 5);
             
             if ($reduzido_ekt != $reduzid_bonerp) {
-                die("Problema com reduzido... bonerp: [" . $produto['reduzido'] . "]. EKT: [" . $ektProduto['REDUZIDO'] . "]");
+                die("Problema com reduzido... bonerp: [" . $produto['reduzido'] . "]. EKT: [" . $ektProduto['REDUZIDO'] . "]" . PHP_EOL . PHP_EOL . PHP_EOL);
             } else {
                 return $produto['reduzido'];
             }
@@ -280,15 +282,15 @@ class ImportarProdutos extends CI_Controller
 
     public function saveProduto($ektProduto, $produto = null)
     {
-        $produto['depto_imp_id'] = $this->findDeptoBycodigo($ektProduto['DEPTO']) or die("Depto não encontrado [" . $ektProduto['DEPTO'] . "]");
-        $produto['subdepto_id'] = $this->findSubdeptoBycodigo($ektProduto['SUBDEPTO']) or die("Subdepto não encontrado [" . $ektProduto['SUBDEPTO'] . "]");
+        $produto['depto_imp_id'] = $this->findDeptoBycodigo($ektProduto['DEPTO']) or die("Depto não encontrado [" . $ektProduto['DEPTO'] . "]" . PHP_EOL . PHP_EOL . PHP_EOL);
+        $produto['subdepto_id'] = $this->findSubdeptoBycodigo($ektProduto['SUBDEPTO']) or die("Subdepto não encontrado [" . $ektProduto['SUBDEPTO'] . "]" . PHP_EOL . PHP_EOL . PHP_EOL);
         $produto['subdepto_err'] = $this->findSubdeptoBycodigo($ektProduto['SUBDEPTO']);
-        $fornecedor_id = $this->fornecedor_model->findByCodigoEkt($ektProduto['FORNEC'], $this->mesano) or die("Fornecedor não encontrado: [" . $ektProduto['FORNEC'] . "] no mesano [" . $this->mesano . "]");
+        $fornecedor_id = $this->fornecedor_model->findByCodigoEkt($ektProduto['FORNEC'], $this->mesano) or die("Fornecedor não encontrado: [" . $ektProduto['FORNEC'] . "] no mesano [" . $this->mesano . "]" . PHP_EOL . PHP_EOL . PHP_EOL);
         $produto['fornecedor_id'] = $fornecedor_id;
         
         $produto['descricao'] = $ektProduto['DESCRICAO'];
         $produto['dt_ult_venda'] = $ektProduto['DATA_ULT_VENDA'];
-        $produto['grade_id'] = $this->findGradeByCodigo($ektProduto['GRADE']) or die("Grade não encontrada [" . $ektProduto['GRADE'] . "]");
+        $produto['grade_id'] = $this->findGradeByCodigo($ektProduto['GRADE']) or die("Grade não encontrada [" . $ektProduto['GRADE'] . "]" . PHP_EOL . PHP_EOL . PHP_EOL);
         $produto['grade_err'] = $ektProduto['GRADE'];
         
         $produto['reduzido'] = $this->handleReduzido($ektProduto, $produto);
@@ -301,7 +303,7 @@ class ImportarProdutos extends CI_Controller
         
         $produto['referencia'] = $ektProduto['REFERENCIA'];
         
-        $produto['unidade_produto_id'] = $this->findUnidadeByLabel($ektProduto['UNIDADE']) or die("Unidade não encontrada: [" . $ektProduto['UNIDADE'] . "]");
+        $produto['unidade_produto_id'] = $this->findUnidadeByLabel($ektProduto['UNIDADE']) or die("Unidade não encontrada: [" . $ektProduto['UNIDADE'] . "]" . PHP_EOL . PHP_EOL . PHP_EOL);
         $produto['unidade_produto_err'] = $ektProduto['UNIDADE'];
         
         $produto['cst'] = 102;
@@ -380,14 +382,14 @@ class ImportarProdutos extends CI_Controller
         ))->result_array();
         
         if (count($saldos) > 0 && $saldos[0]['qtde'] > 0) {
-            die("Já tem saldo [" . $produto['descricao'] . "] e não deveria por causa do truncate do começo.");
+            die("Já tem saldo [" . $produto['descricao'] . "] e não deveria por causa do truncate do começo." . PHP_EOL . PHP_EOL . PHP_EOL);
         }
         
         $qryQtdeTamanhos = $this->dbbonerp->query("SELECT count(*) as qtde FROM est_grade_tamanho WHERE grade_id = ?", array(
             $produto['grade_id']
         ))->result_array();
         if (! $qryQtdeTamanhos[0] or ! $qryQtdeTamanhos[0]['qtde']) {
-            die("Erro ao pesquisar tamanhos para a grade " . $produto['grade_id']);
+            die("Erro ao pesquisar tamanhos para a grade " . $produto['grade_id'] . PHP_EOL . PHP_EOL . PHP_EOL);
         }
         $qtdeTamanhos = $qryQtdeTamanhos[0]['qtde'];
         
@@ -457,6 +459,8 @@ class ImportarProdutos extends CI_Controller
         
         $qtde = (double) $ektProduto['QT' . $ordemStr];
         
+        $qtde += $acumulado;
+        
         if ($qtde != 0.0) {
             echo ">>>>>>>>>>>>>>>>> handleProdutoSaldo - " . $ordem . PHP_EOL;
             
@@ -466,7 +470,7 @@ class ImportarProdutos extends CI_Controller
             ))->result_array();
             
             if (count($qryGt) != 1) {
-                die("Erro ao pesquisar grade. Reduzido: [" . $ektProduto['REDUZIDO'] . "]. Código: [" . $ektProduto['GRADE'] . "]. Ordem: [" . $ordem . "]");
+                die("Erro ao pesquisar grade. Reduzido: [" . $ektProduto['REDUZIDO'] . "]. Código: [" . $ektProduto['GRADE'] . "]. Ordem: [" . $ordem . "]" . PHP_EOL . PHP_EOL . PHP_EOL);
             }
             $gt = $qryGt[0];
             
@@ -625,7 +629,7 @@ class ImportarProdutos extends CI_Controller
             return;
         }
         if ($dtIni == null) {
-            die("dtini null");
+            die("dtini null" . PHP_EOL . PHP_EOL . PHP_EOL);
         }
         if ($dtFim == null) {
             return;
@@ -880,7 +884,7 @@ class ImportarProdutos extends CI_Controller
         $this->mesano = $mesano;
         $this->dtMesano = DateTime::createFromFormat('Ymd', $mesano . "01");
         if (! $this->dtMesano instanceof DateTime) {
-            die("mesano inválido.\n\n\n");
+            die("mesano inválido." . PHP_EOL . PHP_EOL . PHP_EOL);
         }
         
         echo "Iniciando gerarProdutoSaldoHistorico() para mesano = '" . $mesano . "'" . PHP_EOL . PHP_EOL;
@@ -909,7 +913,7 @@ class ImportarProdutos extends CI_Controller
         ))->result_array();
         
         if (count($r_prods) != $total) {
-            die("qtde de produtos diferem");
+            die("qtde de produtos diferem" . PHP_EOL . PHP_EOL . PHP_EOL);
         }
         
         $prods = array();
@@ -939,7 +943,7 @@ class ImportarProdutos extends CI_Controller
         
         $this->dbbonerp->trans_complete();
         
-        $result = $this->dbbonerp->query("CALL sp_total_inventario(?,@a,@b,@c)", array($mesano))->result_array() or die("Query fail: ");
+        $result = $this->dbbonerp->query("CALL sp_total_inventario(?,@a,@b,@c)", array($mesano))->result_array() or die("Query fail: " . PHP_EOL . PHP_EOL . PHP_EOL);
         
         if (count($result) == 1) {
             echo "--------------------------------------------------------------" . PHP_EOL;
