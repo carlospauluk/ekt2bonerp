@@ -917,7 +917,7 @@ class ImportarProdutos extends CI_Controller
         ))->result_array();
         
         if (count($r_prods) != $total) {
-            die("qtde de produtos diferem" . PHP_EOL . PHP_EOL . PHP_EOL);
+            die("qtde de produtos diferem. EKT: [" . $total . "] est_produto_reduzidoektmesano: [" . count($r_prods) . "]" . PHP_EOL . PHP_EOL . PHP_EOL);
         }
         
         $prods = array();
