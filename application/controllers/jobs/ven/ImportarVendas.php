@@ -6,22 +6,6 @@ class ImportarVendas extends CI_Controller
     private $agora;
 
     /**
-     * Qual a pasta dos CSVs.
-     * Será obtido a partir da variável de ambiente EKT_CSVS_PATH.
-     *
-     * @var string
-     */
-    private $csvsPath;
-
-    /**
-     * Qual a pasta do log.
-     * Será obtido a partir da variável de ambiente EKT_LOG_PATH.
-     *
-     * @var string
-     */
-    private $logPath;
-
-    /**
      * Passado pela linha de comando no formato YYYYMM.
      *
      * @var string
@@ -38,6 +22,14 @@ class ImportarVendas extends CI_Controller
     private $inseridas;
 
     private $atualizadas;
+
+    private $totalVendasEkt = 0.0;
+    
+    private $totalVendasEkt_semautorizadas = 0.0;
+
+    private $totalVendasBonerp = 0.0;
+    
+    private $totalVendasBonerp_semautorizadas = 0.0;
 
     /**
      * Conexão ao db ekt.
@@ -84,19 +76,11 @@ class ImportarVendas extends CI_Controller
      * @param $acao (PROD,
      *            DEATE)
      */
-    public function importar($mesano = null)
+    public function importar($mesano)
     {
         $time_start = microtime(true);
         
         echo PHP_EOL . PHP_EOL;
-        
-        $this->csvsPath = getenv('EKT_CSVS_PATH') or die("EKT_CSVS_PATH não informado" . PHP_EOL . PHP_EOL . PHP_EOL);
-        $this->logPath = getenv('EKT_LOG_PATH') or die("EKT_LOG_PATH não informado" . PHP_EOL . PHP_EOL . PHP_EOL);
-        
-        echo "csvsPath: [" . $this->csvsPath . "]" . PHP_EOL;
-        echo "logPath: [" . $this->logPath . "]" . PHP_EOL;
-        $this->logFile = $this->logPath . "espelhos2bonerp-PROD-" . $this->agora->format('Y-m-d_H-i-s') . ".txt";
-        echo "logFile: [" . $this->logFile . "]" . PHP_EOL;
         
         echo "Iniciando a importação para o mês/ano: [" . $mesano . "]" . PHP_EOL;
         $this->mesano = $mesano;
@@ -108,6 +92,32 @@ class ImportarVendas extends CI_Controller
         echo "OK!!!" . PHP_EOL . PHP_EOL;
         
         $this->importarVendas();
+        
+        echo PHP_EOL . PHP_EOL . PHP_EOL;
+        echo "--------------------------------------------------------------" . PHP_EOL;
+        echo "--------------------------------------------------------------" . PHP_EOL;
+        echo "--------------------------------------------------------------" . PHP_EOL;
+        
+        echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> TOTAL VENDAS EKT: " . $this->totalVendasEkt . PHP_EOL;
+        echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>> TOTAL VENDAS EKT (SEM AUTORIZADAS): " . $this->totalVendasEkt_semautorizadas . PHP_EOL;
+        $valorConf = round($this->totalVendasEkt - $this->totalVendasEkt_semautorizadas, 2);
+        echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>> VALOR QUE DEVE ESTAR NO RELATÓRIO: " . $valorConf . PHP_EOL;
+        
+        $regConf = $this->dbbonerp->query("SELECT valor FROM fin_reg_conf WHERE DATE_FORMAT(dt_registro, '%Y%m') = ? AND descricao = 'TOTAL VENDAS (IMPORTADO)'", array($this->mesano))->result_array();
+        
+        if (count($regConf) == 1) {
+            echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> 'TOTAL VENDAS (IMPORTADO)': " . $regConf[0]['valor'] . PHP_EOL;
+            echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> DIFERENÇA: " . round($valorConf - $regConf[0]['valor'], 2) . PHP_EOL . PHP_EOL;
+        } else {
+            echo " reg conf não encontrado " . PHP_EOL;
+        }
+        
+        
+        
+        echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> TOTAL VENDAS BONERP: " . $this->totalVendasBonerp . PHP_EOL;
+        echo ">>>>>>>>>>>>>>>>>>>>>>>>> TOTAL VENDAS BONERP (SEM AUTORIZADAS): " . $this->totalVendasBonerp_semautorizadas . PHP_EOL;
+        
+        echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> DIFERENÇA: " . ($this->totalVendasBonerp - $this->totalVendasEkt) . PHP_EOL;
         
         echo PHP_EOL . PHP_EOL . PHP_EOL;
         echo "--------------------------------------------------------------" . PHP_EOL;
@@ -152,10 +162,17 @@ class ImportarVendas extends CI_Controller
 
     public function importarVenda($ektVenda)
     {
+        $emissao_mesano = DateTime::createFromFormat('Y-m-d', $ektVenda['EMISSAO'])->format('Ym');
+        if ($emissao_mesano != $this->mesano) {
+            die("ektvenda.EMISSAO difere do mesano da importação.");
+        }
+        
         $params = array(
             $ektVenda['NUMERO'],
             $ektVenda['EMISSAO']
         );
+        
+        echo PHP_EOL . ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Importando venda PV = [" . $ektVenda['NUMERO'] . "] em =[" . $ektVenda['EMISSAO'] . "]" . PHP_EOL;
         
         $vendas = $this->dbbonerp->query("SELECT * FROM ven_venda WHERE pv = ? AND dt_venda = ?", $params)->result_array();
         $q = count($vendas);
@@ -169,7 +186,19 @@ class ImportarVendas extends CI_Controller
         $venda = null;
         if ($q == 1) {
             $venda = $vendas[0];
+            
+            $dt_venda_mesano = DateTime::createFromFormat('Y-m-d H:i:s', $venda['dt_venda'])->format('Ym');
+            if ($dt_venda_mesano != $this->mesano) {
+                die("venda.dt_venda difere do mesano da importação.");
+            }
+            if ($venda['mesano'] != $dt_venda_mesano) {
+                die("venda.mesano incompatível com venda.dt_venda.");
+            }
+            
             $this->deletarItens($venda);
+            $this->atualizadas ++;
+        } else {
+            $this->inseridas ++;
         }
         
         $this->salvarVenda($ektVenda, $venda);
@@ -184,6 +213,8 @@ class ImportarVendas extends CI_Controller
 
     public function salvarVenda($ektVenda, $venda = null)
     {
+        $venda['deletado'] = false;
+        
         $venda['status'] = 'FINALIZADA';
         $venda['tipo_venda_id'] = 1;
         $venda['mesano'] = $this->mesano;
@@ -206,24 +237,35 @@ class ImportarVendas extends CI_Controller
         foreach ($ektItens as $ektItem) {
             echo "SALVANDO ITEM: " . $ektItem['PRODUTO'] . " - [" . $ektItem['DESCRICAO'] . "]" . PHP_EOL;
             
-            $ektProduto = $this->dbekt->query("SELECT * from ekt_produto WHERE REDUZIDO = ? AND mesano = ?", array(
-                $ektItem['PRODUTO'],
-                $this->mesano
-            ))->result_array() or die("ekt_produto não encontrado para REDUZIDO = [" . $ektItem['PRODUTO'] . "] e mesano = [" . $this->mesano . "]");
-            if (count($ektProduto) != 1) {
-                die("mais de 1 ekt_produto encontrado para REDUZIDO = [" . $ektItem['PRODUTO'] . "] e mesano = [" . $this->mesano . "]");
+            $ektProduto = null;
+            
+            // Se for um 'NC', não busca.
+            if ($ektItem['PRODUTO'] != 88888) {
+                $ektProduto = $this->dbekt->query("SELECT * from ekt_produto WHERE REDUZIDO = ? AND mesano = ?", array(
+                    $ektItem['PRODUTO'],
+                    $this->mesano
+                ))->result_array() or die("ekt_produto não encontrado para REDUZIDO = [" . $ektItem['PRODUTO'] . "] e mesano = [" . $this->mesano . "]");
+                if (count($ektProduto) != 1) {
+                    die("mais de 1 ekt_produto encontrado para REDUZIDO = [" . $ektItem['PRODUTO'] . "] e mesano = [" . $this->mesano . "]");
+                }
+                $ektProduto = $ektProduto[0];
             }
-            $ektProduto = $ektProduto[0];
             
             $itemVenda = array();
+            
+            $itemVenda['obs'] = "";
             
             $itemVenda['qtde'] = $ektItem['QTDE'];
             $itemVenda['preco_venda'] = $ektItem['VLR_UNIT'];
             
             $valorTotal = round($itemVenda['qtde'] * $itemVenda['preco_venda'], 2);
             
-            if ($valorTotal != $ektItem['VLR_TOTAL']) {
-                die("********** ATENÇÃO: erro em total de produto. Total Produto EKT: " . $valorTotal . ". Total Calculado: " . $ektItem['VLR_TOTAL']);
+            
+            
+            if (bccomp($valorTotal, $ektItem['VLR_TOTAL']) != 0) {
+                $msg = "********** ATENÇÃO: erro em total de produto importado. Total Produto EKT: " . $valorTotal . ". Total Calculado: " . $ektItem['VLR_TOTAL'];
+                echo $msg . PHP_EOL;
+                $itemVenda['obs'] .= PHP_EOL . $msg;
             }
             
             $itemVenda['nc_descricao'] = $ektItem['DESCRICAO'];
@@ -232,11 +274,12 @@ class ImportarVendas extends CI_Controller
             
             // Para NCs
             if ($ektItem['PRODUTO'] == 88888) {
-                $itemVenda['obs'] = "NC 88888";
+                $itemVenda['obs'] .= PHP_EOL . "NC 88888";
+                $itemVenda['grade_tamanho_id'] = 2;
             } else {
                 
                 $produto = $this->produto_model->findByReduzidoEktAndMesano($ektItem['PRODUTO'], $this->mesano);
-                if (!$produto) {
+                if (! $produto) {
                     die("est_produto não encontrado para REDUZIDO = [" . $itemVenda['PRODUTO'] . "] em mesano = [" . $this->mesano . "]" . PHP_EOL . PHP_EOL);
                 }
                 $itemVenda['produto_id'] = $produto['id'];
@@ -267,19 +310,28 @@ class ImportarVendas extends CI_Controller
         $venda['desconto_especial'] = $ektVenda['DESC_ESPECIAL'] ? $ektVenda['DESC_ESPECIAL'] : 0.0;
         $venda['historicoDesconto'] = $ektVenda['HIST_DESC'];
         
-        if ($subTotalVenda != $ektVenda['SUB_TOTAL']) {
-            die("********** ATENÇÃO: erro em SUB TOTAL VENDA: " . $ektVenda['SUB_TOTAL'] . ". TOTAL SOMADO: " . $subTotalVenda . PHP_EOL);
+        if (bccomp($subTotalVenda, $ektVenda['SUB_TOTAL']) != 0) {
+            $msg = "********** ATENÇÃO: erro em SUB TOTAL VENDA: " . $ektVenda['SUB_TOTAL'] . ". TOTAL SOMADO: " . $subTotalVenda;
+            echo $msg . PHP_EOL;
+            $venda['obs'] .= PHP_EOL . $msg;
         }
         
         $venda['sub_total'] = $subTotalVenda;
         
-        $totalVenda = $subTotalVenda + $venda['desconto_plano'] + $venda['desconto_especial'];
+        $totalVendaCalculado = $subTotalVenda + $venda['desconto_plano'] + $venda['desconto_especial'];
         
-        if ($totalVenda != $ektVenda['TOTAL']) {
-            die("********** ATENÇÃO: erro em TOTAL VENDA: " . $ektVenda['TOTAL'] . ". TOTAL SOMA: " . $totalVenda . PHP_EOL);
+        $totalVendaEKT = (float) $ektVenda['TOTAL'];
+        
+        if (bccomp($totalVendaCalculado, $totalVendaEKT) != 0) {
+            $msg = "********** ATENÇÃO: erro em TOTAL VENDA EKT: [" . $totalVendaEKT . "] TOTAL SOMA: [" . $totalVendaCalculado . "]";
+            echo $msg . PHP_EOL;
+            $venda['obs'] .= PHP_EOL . $msg;
         }
         
-        $venda['valor_total'] = $totalVenda;
+        
+        
+//         $venda['valor_total'] = $totalVendaCalculado;
+        $venda['valor_total'] = $totalVendaEKT;
         
         $venda_id = $this->venda_model->save($venda);
         
@@ -287,6 +339,11 @@ class ImportarVendas extends CI_Controller
             $venda_item['venda_id'] = $venda_id;
             $this->vendaitem_model->save($venda_item);
         }
+        
+        $this->totalVendasEkt += $totalVendaEKT;
+        $this->totalVendasEkt_semautorizadas += $ektVenda['COND_PAG'] == '6.00' ? $totalVendaEKT : 0.0;
+        $this->totalVendasBonerp += $totalVendaCalculado;
+        $this->totalVendasBonerp_semautorizadas += $ektVenda['COND_PAG'] == '6.00' ? $totalVendaCalculado : 0.0;
         
         echo ">>>>>>>>>>>>>>>> VENDA SALVA" . PHP_EOL;
     }
@@ -365,9 +422,7 @@ class ImportarVendas extends CI_Controller
     public function findPlanoPagto($condPag)
     {
         if (! $this->planosPagto) {
-            $r = $this->dbbonerp->query("SELECT id, codigo, descricao FROM ven_plano_pagto WHERE codigo = ?", array(
-                $condPag
-            ))->result_array();
+            $r = $this->dbbonerp->query("SELECT id, codigo, descricao FROM ven_plano_pagto")->result_array();
             if (! $r or count($r) < 1) {
                 die("Nenhum plano de pagto encontrado na base.");
             }
@@ -375,8 +430,9 @@ class ImportarVendas extends CI_Controller
                 $this->planosPagto[$pp['codigo']] = $pp['id'];
             }
         }
-        if (! $this->planosPagto[$condPag]) {
-            die("Plano de pagto não encontrado para: [" . $condPag . "]" . PHP_EOL . PHP_EOL);
+        if (! array_key_exists($condPag, $this->planosPagto)) {
+            echo "Plano de pagto não encontrado para: [" . $condPag . "]" . PHP_EOL . PHP_EOL;
+            return $this->planosPagto['9.99'];
         }
         return $this->planosPagto[$condPag];
     }
@@ -434,7 +490,63 @@ class ImportarVendas extends CI_Controller
                 $this->gradesTamanhos[$gt['codigo']][$_tamanho] = $gt['id'];
             }
         }
-        // Se não achar, retorna o 999999 (ERRO DE IMPORTAÇÃO)
-        return $this->gradesTamanhos[$codigo][$tamanho] or die("est_grade_tamanho não encontrada para codigo = [" . $codigo . "] e tamanho = [" . $tamanho . "]");
+        
+        if (! array_key_exists($codigo, $this->gradesTamanhos) or (! array_key_exists($tamanho, $this->gradesTamanhos[$codigo]))) {
+            return 99;
+        } else {
+            return $this->gradesTamanhos[$codigo][$tamanho] or die("est_grade_tamanho não encontrada para codigo = [" . $codigo . "] e tamanho = [" . $tamanho . "]");
+        }
+    }
+
+    public function marcarDeletadas($mesano)
+    {
+        $time_start = microtime(true);
+        
+        echo PHP_EOL . PHP_EOL;
+        
+        echo "Marcando vendas deletadas para o mês/ano: [" . $mesano . "]" . PHP_EOL;
+        $this->mesano = $mesano;
+        $this->dtMesano = DateTime::createFromFormat('Ymd', $mesano . "01");
+        if (! $this->dtMesano instanceof DateTime) {
+            die("mesano inválido." . PHP_EOL . PHP_EOL . PHP_EOL);
+        }
+        $this->dtMesano->setTime(0, 0, 0, 0);
+        
+        $vendas = $this->dbbonerp->query("SELECT * FROM ven_venda WHERE deletado IS FALSE AND mesano = ?", array(
+            $this->mesano
+        ))->result_array();
+        
+        $ektVendas = $this->dbekt->query("SELECT NUMERO FROM ekt_venda WHERE mesano = ?", array(
+            $this->mesano
+        ))->result_array();
+        
+        $ektVendaz = array();
+        
+        foreach ($ektVendas as $ektVenda) {
+            $ektVendaz[] = $ektVenda['NUMERO'];
+        }
+        
+        $deletadas = 0;
+        foreach ($vendas as $venda) {
+            if (! array_search($venda['pv'], $ektVendaz)) {
+                echo $venda['pv'] . " não existe. Marcando como deletada..." . PHP_EOL;
+                $venda['deletado'] = true;
+                $this->venda_model->save($venda);
+                $deletadas ++;
+                echo "OK!!!" . PHP_EOL . PHP_EOL;
+            }
+        }
+        
+        echo PHP_EOL . PHP_EOL . PHP_EOL;
+        echo "--------------------------------------------------------------" . PHP_EOL;
+        echo "--------------------------------------------------------------" . PHP_EOL;
+        echo "--------------------------------------------------------------" . PHP_EOL;
+        echo "DELETADAS: " . $deletadas . PHP_EOL;
+        
+        $time_end = microtime(true);
+        $execution_time = ($time_end - $time_start);
+        echo PHP_EOL . PHP_EOL . PHP_EOL;
+        echo "----------------------------------" . PHP_EOL;
+        echo "Total Execution Time: " . $execution_time . "s" . PHP_EOL . PHP_EOL . PHP_EOL;
     }
 }
