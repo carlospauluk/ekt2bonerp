@@ -9,10 +9,10 @@
  *
  *
  * set EKT_CSVS_PATH=\\10.1.1.100\export
- * set EKT_LOG_PATH=C:\ekt2bonerp\log\
- *
- * export EKT_CSVS_PATH=/mnt/10.1.1.100-export/
- * export EKT_LOG_PATH=~/dev/github/ekt2bonerp/log/
+ * set EKT_LOG_PATH=C:\ekt2bonerp\log
+ * 
+ * export EKT_CSVS_PATH=/mnt/10.1.1.100-export
+ * export EKT_LOG_PATH=~/dev/github/ekt2bonerp/log
  *
  * php index.php jobs/ekt/ImportarEkt2Espelhos importar YYYYMM FOR-PROD-...
  */
@@ -94,12 +94,9 @@ class ImportarEkt2Espelhos extends CI_Controller
         $this->csvsPath = getenv('EKT_CSVS_PATH') or die("EKT_CSVS_PATH não informado\n\n\n");
         $this->logPath = getenv('EKT_LOG_PATH') or die("EKT_LOG_PATH não informado\n\n\n");
         
-        $this->mesAno = $mesano;
+        $this->mesano = $mesano;
         
-        // Se o mesano passado não for o corrente, vai buscar os csvs nas pastas arquivadas.
-        if ($this->agora->format('Ym') != $mesano) {
-            $this->csvsPath .= "/" . $mesano . "/";
-        }
+        $this->csvsPath .= "/" . $mesano . "/";
         
         echo "csvsPath: [" . $this->csvsPath . "]" . PHP_EOL;
         echo "logPath: [" . $this->logPath . "]" . PHP_EOL;
@@ -167,7 +164,7 @@ class ImportarEkt2Espelhos extends CI_Controller
         echo "IMPORTANDO DEPTOS..." . PHP_EOL . PHP_EOL;
         
         if (! $this->dbekt->query("DELETE FROM ekt_depto WHERE mesano = ?", array(
-            $this->mesAno
+            $this->mesano
         ))) {
             log_message('error', 'DELETE FROM ekt_depto WHERE mesano = ?');
             return;
@@ -204,7 +201,7 @@ class ImportarEkt2Espelhos extends CI_Controller
             $ektDepto['MARGEM'] = $campos[3];
             $ektDepto['PECAS_AC'] = $campos[4];
             $ektDepto['VENDAS_AC'] = $campos[5];
-            $ektDepto['mesano'] = $this->mesAno;
+            $ektDepto['mesano'] = $this->mesano;
             
             $this->handleIudtUserInfo($ektDepto);
             
@@ -229,7 +226,7 @@ class ImportarEkt2Espelhos extends CI_Controller
         echo "IMPORTANDO SUBDEPTOS..." . PHP_EOL . PHP_EOL;
         
         if (! $this->dbekt->query("DELETE FROM ekt_subdepto WHERE mesano = ?", array(
-            $this->mesAno
+            $this->mesano
         ))) {
             log_message('error', 'DELETE FROM ekt_subdepto WHERE mesano = ?');
             return;
@@ -311,7 +308,7 @@ class ImportarEkt2Espelhos extends CI_Controller
             $ektSubdepto['VENDAS_AC12'] = $campos[27];
             $ektSubdepto['SAZON'] = $campos[28];
             
-            $ektSubdepto['mesano'] = $this->mesAno;
+            $ektSubdepto['mesano'] = $this->mesano;
             
             $this->handleIudtUserInfo($ektSubdepto);
             
@@ -341,7 +338,7 @@ class ImportarEkt2Espelhos extends CI_Controller
         
         $this->dbekt->trans_start();
         
-        if (! $model->delete_by_mesano($this->mesAno)) {
+        if (! $model->delete_by_mesano($this->mesano)) {
             log_message('error', 'Erro em deleteByMesAno');
             return;
         }
@@ -418,7 +415,7 @@ class ImportarEkt2Espelhos extends CI_Controller
             $ektFornecedor['DATA_ULT_COMP'] = $this->datetime_library->dateStrToSqlDate($campos[21]);
             $ektFornecedor['PECAS_AC'] = $campos[22]; // double
             $ektFornecedor['TIPO'] = $campos[23];
-            $ektFornecedor['mesano'] = $this->mesAno;
+            $ektFornecedor['mesano'] = $this->mesano;
             
             $setembro2015 = DateTime::createFromFormat('d/m/Y', '30/09/2015');
             $outubro2015 = DateTime::createFromFormat('d/m/Y', '31/10/2015');
@@ -456,7 +453,7 @@ class ImportarEkt2Espelhos extends CI_Controller
         $model = $this->ektproduto_model;
         $model->setDb($this->dbekt);
         
-        if (! $model->delete_by_mesano($this->mesAno)) {
+        if (! $model->delete_by_mesano($this->mesano)) {
             log_message('error', 'Erro em deleteByMesAno');
             return;
         }
@@ -564,7 +561,7 @@ class ImportarEkt2Espelhos extends CI_Controller
                 $ektProduto['DT_ULTALT'] = $this->datetime_library->dateStrToSqlDate($campos[49]);
             }
             
-            $ektProduto['mesano'] = $this->mesAno;
+            $ektProduto['mesano'] = $this->mesano;
             
             $this->handleIudtUserInfo($ektProduto);
             
@@ -587,15 +584,12 @@ class ImportarEkt2Espelhos extends CI_Controller
         
         echo PHP_EOL . PHP_EOL . "IMPORTANDO VENDEDORES..." . PHP_EOL . PHP_EOL;
         
-        $this->load->model('ekt/ektvendedor_model');
-        $model = $this->ektvendedor_model;
-        $model->setDb($this->dbekt);
-        
-        if (! $model->truncate_table()) {
-            log_message('error', 'Erro em truncate table');
-            return;
+        $model = new \CIBases\Models\DAO\Base\Base_model('ekt_vendedor', 'ekt');
+
+        if (!$this->dbekt->query("DELETE FROM ekt_vendedor WHERE mesano = '" . $this->mesano . "'")) {
+            die("Erro ao deletar vendedores do mesano." . PHP_EOL . PHP_EOL);
         }
-        
+                
         $linhas = file($this->csvsPath . "est_d008.csv");
         
         if (! $linhas or count($linhas) < 0) {
@@ -612,14 +606,15 @@ class ImportarEkt2Espelhos extends CI_Controller
             $campos = explode(";", $linha);
             
             $ektVendedor = array();
-            $ektVendedor['RECORD_NUMBER'] = $campos[1];
-            $ektVendedor['CODIGO'] = $campos[2];
+            $ektVendedor['RECORD_NUMBER'] = $i;
+            $ektVendedor['CODIGO'] = $campos[1];
+            $ektVendedor['DESCRICAO'] = $campos[2];
             $ektVendedor['COMIS_VIS'] = $campos[3];
             $ektVendedor['COMIS_PRA'] = $campos[4];
             $ektVendedor['FLAG_GER'] = $campos[5];
             $ektVendedor['SENHA'] = $campos[6];
             
-            $ektVendedor['mesano'] = $this->mesAno;
+            $ektVendedor['mesano'] = $this->mesano;
             
             $this->handleIudtUserInfo($ektVendedor);
             
@@ -646,7 +641,7 @@ class ImportarEkt2Espelhos extends CI_Controller
         $model = $this->ektvenda_model;
         $model->setDb($this->dbekt);
         
-        if (! $model->delete_by_mesano($this->mesAno)) {
+        if (! $model->delete_by_mesano($this->mesano)) {
             log_message('error', 'Erro em deleteByMesAno');
             return;
         }
@@ -715,7 +710,7 @@ class ImportarEkt2Espelhos extends CI_Controller
             $ektVenda['P12'] = $campos[42];
             $ektVenda['P13'] = $campos[43];
             
-            $ektVenda['mesano'] = $this->mesAno;
+            $ektVenda['mesano'] = $this->mesano;
             
             $this->handleIudtUserInfo($ektVenda);
             
@@ -742,7 +737,7 @@ class ImportarEkt2Espelhos extends CI_Controller
         $model = $this->ektvendaitem_model;
         $model->setDb($this->dbekt);
         
-        if (! $model->delete_by_mesano($this->mesAno)) {
+        if (! $model->delete_by_mesano($this->mesano)) {
             log_message('error', 'Erro em deleteByMesAno');
             return;
         }
@@ -779,7 +774,7 @@ class ImportarEkt2Espelhos extends CI_Controller
             $ektVendaItem['PRECO_CUSTO'] = $campos[12];
             $ektVendaItem['PRECO_VISTA'] = $campos[13];
             
-            $ektVendaItem['mesano'] = $this->mesAno;
+            $ektVendaItem['mesano'] = $this->mesano;
             
             $this->handleIudtUserInfo($ektVendaItem);
             
@@ -867,7 +862,7 @@ class ImportarEkt2Espelhos extends CI_Controller
             $ektPedido['QTDEBX'] = $campos[20];
             $ektPedido['PTOTALBX'] = $campos[21];
             
-            $ektPedido['mesano'] = $this->mesAno;
+            $ektPedido['mesano'] = $this->mesano;
             
             $this->handleIudtUserInfo($ektPedido);
             
@@ -952,7 +947,7 @@ class ImportarEkt2Espelhos extends CI_Controller
             $ektEncomenda['PRAZO'] = $campos[30];
             $ektEncomenda['SDO_PAGAR'] = $campos[31];
             
-            $ektEncomenda['mesano'] = $this->mesAno;
+            $ektEncomenda['mesano'] = $this->mesano;
             
             $this->handleIudtUserInfo($ektEncomenda);
             
@@ -1025,7 +1020,7 @@ class ImportarEkt2Espelhos extends CI_Controller
             $ektEncomendaItem['EMISSAO'] = $this->datetime_library->dateStrToSqlDate($campos[21], '');
             $ektEncomendaItem['FLAG_INT'] = $campos[22];
             
-            $ektEncomendaItem['mesano'] = $this->mesAno;
+            $ektEncomendaItem['mesano'] = $this->mesano;
             
             $this->handleIudtUserInfo($ektEncomendaItem);
             

@@ -36,4 +36,24 @@ class Produto_model extends CIBases\Models\DAO\Base\Base_model
             return $r;
         }
     }
+
+    public function findByReduzidoEktAndMesano($reduzidoEkt, $mesano)
+    {
+        $sql = "SELECT p.* FROM est_produto_reduzidoektmesano r, est_produto p WHERE p.id = r.produto_id AND r.reduzido_ekt = ? AND r.mesano = ?";
+        
+        $params = array(
+            $reduzidoEkt,
+            $mesano
+        );
+        
+        $r = $this->db->query($sql, $params)->result_array();
+        
+        if (count($r) == 1) {
+            return $r[0];
+        } else if (count($r) == 0) {
+            return null;
+        } else {
+            throw new \Exception("Mais de um produto encontrado na est_produto_reduzidoektmesano para reduzido_ekt = [" . $reduzidoEkt . "] e mesano = [" . $mesano . "]");
+        }
+    }
 }
