@@ -1,5 +1,19 @@
 <?php
 
+/**
+ * Job que realiza a importação dos dados de vendas da base ekt para a base bonerp. bonerp
+ *
+ * Para rodar, pela linha de comando, chamar com:
+ *
+ *
+ * set EKT_CSVS_PATH=\\10.1.1.100\export
+ * set EKT_LOG_PATH=C:\ekt2bonerp\log
+ *
+ * export EKT_CSVS_PATH=/mnt/10.1.1.100-export
+ * export EKT_LOG_PATH=~/dev/github/ekt2bonerp/log
+ *
+ * php index.php jobs/ekt/ImportarEkt2Espelhos importar YYYYMM FOR-PROD-...
+ */
 class ImportarVendas extends CI_Controller
 {
 
@@ -24,11 +38,11 @@ class ImportarVendas extends CI_Controller
     private $atualizadas;
 
     private $totalVendasEkt = 0.0;
-    
+
     private $totalVendasEkt_semautorizadas = 0.0;
 
     private $totalVendasBonerp = 0.0;
-    
+
     private $totalVendasBonerp_semautorizadas = 0.0;
 
     /**
@@ -103,7 +117,9 @@ class ImportarVendas extends CI_Controller
         $valorConf = round($this->totalVendasEkt - $this->totalVendasEkt_semautorizadas, 2);
         echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>> VALOR QUE DEVE ESTAR NO RELATÓRIO: " . $valorConf . PHP_EOL;
         
-        $regConf = $this->dbbonerp->query("SELECT valor FROM fin_reg_conf WHERE DATE_FORMAT(dt_registro, '%Y%m') = ? AND descricao = 'TOTAL VENDAS (IMPORTADO)'", array($this->mesano))->result_array();
+        $regConf = $this->dbbonerp->query("SELECT valor FROM fin_reg_conf WHERE DATE_FORMAT(dt_registro, '%Y%m') = ? AND descricao = 'TOTAL VENDAS (IMPORTADO)'", array(
+            $this->mesano
+        ))->result_array();
         
         if (count($regConf) == 1) {
             echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> 'TOTAL VENDAS (IMPORTADO)': " . $regConf[0]['valor'] . PHP_EOL;
@@ -111,8 +127,6 @@ class ImportarVendas extends CI_Controller
         } else {
             echo " reg conf não encontrado " . PHP_EOL;
         }
-        
-        
         
         echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> TOTAL VENDAS BONERP: " . $this->totalVendasBonerp . PHP_EOL;
         echo ">>>>>>>>>>>>>>>>>>>>>>>>> TOTAL VENDAS BONERP (SEM AUTORIZADAS): " . $this->totalVendasBonerp_semautorizadas . PHP_EOL;
@@ -244,11 +258,18 @@ class ImportarVendas extends CI_Controller
                 $ektProduto = $this->dbekt->query("SELECT * from ekt_produto WHERE REDUZIDO = ? AND mesano = ?", array(
                     $ektItem['PRODUTO'],
                     $this->mesano
-                ))->result_array() or die("ekt_produto não encontrado para REDUZIDO = [" . $ektItem['PRODUTO'] . "] e mesano = [" . $this->mesano . "]");
-                if (count($ektProduto) != 1) {
-                    die("mais de 1 ekt_produto encontrado para REDUZIDO = [" . $ektItem['PRODUTO'] . "] e mesano = [" . $this->mesano . "]");
+                ))->result_array();
+                
+                if (! $ektProduto or count($ektProduto) == 0) {
+                    echo "ekt_produto não encontrado para REDUZIDO = [" . $ektItem['PRODUTO'] . "] e mesano = [" . $this->mesano . "]" . PHP_EOL;
+                    $ektItem['PRODUTO'] = 88888;
+                } else {
+                    if (count($ektProduto) > 1) {
+                        die("mais de 1 ekt_produto encontrado para REDUZIDO = [" . $ektItem['PRODUTO'] . "] e mesano = [" . $this->mesano . "]");
+                    } else {
+                        $ektProduto = $ektProduto[0];
+                    }
                 }
-                $ektProduto = $ektProduto[0];
             }
             
             $itemVenda = array();
@@ -259,8 +280,6 @@ class ImportarVendas extends CI_Controller
             $itemVenda['preco_venda'] = $ektItem['VLR_UNIT'];
             
             $valorTotal = round($itemVenda['qtde'] * $itemVenda['preco_venda'], 2);
-            
-            
             
             if (bccomp($valorTotal, $ektItem['VLR_TOTAL']) != 0) {
                 $msg = "********** ATENÇÃO: erro em total de produto importado. Total Produto EKT: " . $valorTotal . ". Total Calculado: " . $ektItem['VLR_TOTAL'];
@@ -328,9 +347,7 @@ class ImportarVendas extends CI_Controller
             $venda['obs'] .= PHP_EOL . $msg;
         }
         
-        
-        
-//         $venda['valor_total'] = $totalVendaCalculado;
+        // $venda['valor_total'] = $totalVendaCalculado;
         $venda['valor_total'] = $totalVendaEKT;
         
         $venda_id = $this->venda_model->save($venda);
