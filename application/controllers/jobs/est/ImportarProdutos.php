@@ -131,7 +131,7 @@ class ImportarProdutos extends CI_Controller
             if (! $this->dtMesano instanceof DateTime) {
                 die("mesano inválido." . PHP_EOL . PHP_EOL . PHP_EOL);
             }
-            $this->dtMesano->setTime(0,0,0,0);
+            $this->dtMesano->setTime(0, 0, 0, 0);
             echo 'LIMPANDO A est_produto_saldo...' . PHP_EOL;
             $this->deletarSaldos();
             echo "OK!!!" . PHP_EOL . PHP_EOL;
@@ -1010,12 +1010,9 @@ class ImportarProdutos extends CI_Controller
         exit();
     }
 
-    public function teste($mesano)
-    {
-        $results = $this->findByReduzidoEkt(1234, '201702');
-        print_r($results);
-    }
-
+    /**
+     * Corrige os bonerp.est_produto.reduzido para o novo padrão: AAMM0000099999.
+     */
     public function corrigirReduzidos()
     {
         $time_start = microtime(true);
@@ -1066,4 +1063,65 @@ class ImportarProdutos extends CI_Controller
         echo "----------------------------------" . PHP_EOL;
         echo "Total Execution Time: " . $execution_time . "s" . PHP_EOL . PHP_EOL . PHP_EOL;
     }
+
+    /**
+     * 
+     */
+    public function corrigirEktDesdeAte()
+    {
+        $time_start = microtime(true);
+        $this->dbbonerp->trans_start();
+        
+        echo PHP_EOL . PHP_EOL;
+        
+        $prods = $this->dbbonerp->query("SELECT id, reduzido_ekt_desde, reduzido_ekt_ate FROM est_produto WHERE reduzido_ekt is not null AND reduzido_ekt != '88888'")->result_array();
+        
+        $i=0;
+        $total = count($prods);
+        
+        
+        foreach ($prods as $prod) {
+            
+            $ekts = $this->dbbonerp->query("SELECT mesano FROM est_produto_reduzidoektmesano WHERE produto_id = ?", array($prod['id']))->result_array();
+            
+            if (!$ekts or count($ekts) < 1) {
+                die("est_produto_reduzidoektmesano não encontrado para est_produto.id = [" . $prod['id'] . "]" . PHP_EOL);
+            }
+            
+            $desde = DateTime::createFromFormat('Ym', $ekts[0]['mesano'])->format('Y-m-') . "01";
+            $ate = DateTime::createFromFormat('Ym', $ekts[count($ekts)-1]['mesano'])->format('Y-m-t');
+            
+            $prod['reduzido_ekt_desde'] = $desde;
+            $prod['reduzido_ekt_ate'] = $ate;
+            
+            $this->dbbonerp->update('est_produto', $prod, array(
+                'id' => $prod['id']
+            )) or $this->exit_db_error("Erro ao atualizar 'reduzido_ekt_desde'");
+            
+            echo " >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> " . ++ $i . "/" . $total . PHP_EOL;
+            
+        }
+        
+        echo "Finalizando... commitando a transação..." . PHP_EOL;
+        
+        $this->dbbonerp->trans_complete();
+        
+        
+        echo PHP_EOL . PHP_EOL . PHP_EOL;
+        echo "--------------------------------------------------------------" . PHP_EOL;
+        echo "--------------------------------------------------------------" . PHP_EOL;
+        echo "--------------------------------------------------------------" . PHP_EOL;
+        $time_end = microtime(true);
+        $execution_time = ($time_end - $time_start);
+        echo PHP_EOL . PHP_EOL . PHP_EOL;
+        echo "----------------------------------" . PHP_EOL;
+        echo "Total Execution Time: " . $execution_time . "s" . PHP_EOL . PHP_EOL . PHP_EOL;
+        
+        
+    }
 }
+
+
+
+
+

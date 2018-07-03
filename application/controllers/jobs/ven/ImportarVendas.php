@@ -249,9 +249,14 @@ class ImportarVendas extends CI_Controller
         $subTotalVenda = 0.0;
         $venda_itens = array();
         foreach ($ektItens as $ektItem) {
+            
             echo "SALVANDO ITEM: " . $ektItem['PRODUTO'] . " - [" . $ektItem['DESCRICAO'] . "]" . PHP_EOL;
             
             $ektProduto = null;
+            
+            if (!$ektItem['PRODUTO']) {
+                $ektItem['PRODUTO'] = "88888";
+            }
             
             // Se for um 'NC', não busca.
             if ($ektItem['PRODUTO'] != 88888) {
@@ -299,7 +304,7 @@ class ImportarVendas extends CI_Controller
                 
                 $produto = $this->produto_model->findByReduzidoEktAndMesano($ektItem['PRODUTO'], $this->mesano);
                 if (! $produto) {
-                    die("est_produto não encontrado para REDUZIDO = [" . $itemVenda['PRODUTO'] . "] em mesano = [" . $this->mesano . "]" . PHP_EOL . PHP_EOL);
+                    die("est_produto não encontrado para REDUZIDO = [" . $ektItem['PRODUTO'] . "] em mesano = [" . $this->mesano . "]" . PHP_EOL . PHP_EOL);
                 }
                 $itemVenda['produto_id'] = $produto['id'];
                 $itemVenda['grade_tamanho_id'] = $this->findGradeTamanhoByCodigoAndTamanho($ektProduto['GRADE'], $ektItem['TAMANHO']);
