@@ -81,6 +81,12 @@ class ImportarVendas extends CI_Controller
         
         $this->ektvenda_model = new \CIBases\Models\DAO\Base\Base_model('ekt_venda', 'ekt');
         $this->ektvenda_model->setDb($this->dbekt);
+        
+        $this->pessoa_model = new \CIBases\Models\DAO\Base\Base_model('bon_pessoa', 'bonerp');
+        $this->pessoa_model->setDb($this->dbbonerp);
+        
+        $this->funcionario_model = new \CIBases\Models\DAO\Base\Base_model('rh_funcionario', 'bonerp');
+        $this->funcionario_model->setDb($this->dbbonerp);
     }
 
     /**
@@ -152,6 +158,10 @@ class ImportarVendas extends CI_Controller
         echo "Iniciando a importação de vendas..." . PHP_EOL;
         $this->dbbonerp->trans_start();
         
+        
+        $this->importarVendedores();
+        
+        
         $l = $this->dbekt->query("SELECT * FROM ekt_venda WHERE mesano = ?", array(
             $this->mesano
         ))->result_array();
@@ -173,6 +183,35 @@ class ImportarVendas extends CI_Controller
         
         echo "OK!!!" . PHP_EOL;
     }
+    
+    public function importarVendedores() {
+        $ektVendedores = $this->dbekt->query("SELECT CODIGO, DESCRICAO FROM ekt_vendedor WHERE mesano = ?", array($this->mesano))->result_array();
+        
+        if (count($ektVendedores) < 1) {
+            die("Nenhum ekt_vendedor encontrado no mesano." . PHP_EOL);
+        }
+        
+        foreach ($ektVendedores as $ektVendedor) {
+            $nomeEkt = trim($ektVendedor['DESCRICAO']);
+            if (!$nomeEkt) continue;
+            $codigo = trim($ektVendedor['CODIGO']);
+            if ($codigo == 99) continue;
+            $vendedor = $this->dbbonerp->query("SELECT 1 FROM rh_funcionario WHERE nome_ekt = ? AND codigo = ?", array($nomeEkt, $codigo))->result_array();
+            if (!$vendedor) {
+                $pessoa['nome'] = $nomeEkt;
+                $pessoaId = $this->pessoa_model->save($pessoa);
+                
+                $funcionario['clt'] = true;
+                $funcionario['nome_ekt'] = $nomeEkt;
+                $funcionario['codigo'] = $codigo;
+                $funcionario['vendedor_comissionado'] = true;
+                $funcionario['pessoa_id'] = $pessoaId;
+                $this->funcionario_model->save($funcionario);                
+            }
+        }
+        
+    }
+    
 
     public function importarVenda($ektVenda)
     {
