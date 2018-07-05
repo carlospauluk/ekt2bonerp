@@ -109,56 +109,60 @@ class ImportarProdutos extends CI_Controller
     {
         $time_start = microtime(true);
         
-        $this->csvsPath = getenv('EKT_CSVS_PATH') or die("EKT_CSVS_PATH não informado" . PHP_EOL . PHP_EOL . PHP_EOL);
+        $this->csvsPath = getenv('EKT_CSVS_PATH') or die("EKT_CSVS_PATH não informado");
         
-        $logPath = getenv('EKT_LOG_PATH') or die("EKT_LOG_PATH não informado" . PHP_EOL . PHP_EOL . PHP_EOL);
+        $logPath = getenv('EKT_LOG_PATH') or die("EKT_LOG_PATH não informado");
         $prefix = "ImportarProdutos" . '_' . $mesano . '_' . $acao . "_";
         $this->logger = new LogWriter($logPath, $prefix);
         
-        $this->logger->writeLog("csvsPath: [" . $this->csvsPath . "]" . PHP_EOL);
-        $this->logger->writeLog("logPath: [" . $logPath . "]" . PHP_EOL);
-        $logFile = $this->logPath . "espelhos2bonerp-PROD-" . $this->agora->format('Y-m-d_H-i-s') . ".txt";
-        $this->logger->writeLog("logFile: [" . $logFile . "]" . PHP_EOL);
+        $this->logger->info("csvsPath: [" . $this->csvsPath . "]");
+        $this->logger->info("logPath: [" . $logPath . "]");
         
-        if ($acao == 'PROD') {
-            $this->logger->writeLog("Iniciando a importação para o mês/ano: [" . $mesano . "]" . PHP_EOL);
-            $this->mesano = $mesano;
-            $this->dtMesano = DateTime::createFromFormat('Ymd', $mesano . "01");
-            if (! $this->dtMesano instanceof DateTime) {
-                die("mesano inválido." . PHP_EOL . PHP_EOL . PHP_EOL);
-            }
-            $this->dtMesano->setTime(0, 0, 0, 0);
-            $this->logger->writeLog('LIMPANDO A est_produto_saldo...' . PHP_EOL);
-            $this->deletarSaldos();
-            $this->logger->writeLog("OK!!!" . PHP_EOL . PHP_EOL);
-            
-            $this->importarProdutos();
+        $this->mesano = $mesano;
+        $this->dtMesano = DateTime::createFromFormat('Ymd', $mesano . "01");
+        if (! $this->dtMesano instanceof DateTime) {
+            $this->logger->info("mesano inválido.");
+            $this->logger->sendMail();
+            $this->logger->closeLog();
+            exit();
         }
         
-        $this->gerarProdutoSaldoHistorico();
+        if ($acao == 'PROD') {
+            $this->logger->info("Iniciando a importação para o mês/ano: [" . $mesano . "]");
+            $this->dtMesano->setTime(0, 0, 0, 0);
+            $this->logger->info('LIMPANDO A est_produto_saldo...');
+            $this->deletarSaldos();
+            $this->logger->info("OK!!!");
+            
+            $this->importarProdutos();
+            $this->gerarProdutoSaldoHistorico();
+            $this->corrigirEktDesdeAte();
+        }
         
-        $this->corrigirEktDesdeAte();
+        if ($acao == 'PRECOS') {
+            $this->corrigirPrecos();
+        }
         
-        $this->logger->writeLog(PHP_EOL . PHP_EOL . PHP_EOL);
-        $this->logger->writeLog("--------------------------------------------------------------" . PHP_EOL);
-        $this->logger->writeLog("--------------------------------------------------------------" . PHP_EOL);
-        $this->logger->writeLog( "--------------------------------------------------------------" . PHP_EOL);
-        $this->logger->writeLog( "INSERIDOS: " . $this->inseridos . PHP_EOL);
-        $this->logger->writeLog( "ATUALIZADOS: " . $this->atualizados . PHP_EOL);
-        $this->logger->writeLog( "ACERTADOS DEPARA: " . $this->acertados_depara . PHP_EOL);
+        $this->logger->info(PHP_EOL);
+        $this->logger->info("--------------------------------------------------------------");
+        $this->logger->info("--------------------------------------------------------------");
+        $this->logger->info("--------------------------------------------------------------");
+        $this->logger->info("INSERIDOS: " . $this->inseridos);
+        $this->logger->info("ATUALIZADOS: " . $this->atualizados);
+        $this->logger->info("ACERTADOS DEPARA: " . $this->acertados_depara);
         
         $time_end = microtime(true);
         $execution_time = ($time_end - $time_start);
-        $this->logger->writeLog( PHP_EOL . PHP_EOL . PHP_EOL);
-        $this->logger->writeLog( "----------------------------------" . PHP_EOL);
-        $this->logger->writeLog( "Total Execution Time: " . $execution_time . "s" . PHP_EOL . PHP_EOL . PHP_EOL);
-        $this->logger->closeLog();
+        $this->logger->info(PHP_EOL);
+        $this->logger->info("----------------------------------");
+        $this->logger->info("Total Execution Time: " . $execution_time . "s");
         $this->logger->sendMail();
+        $this->logger->closeLog();
     }
 
     private function importarProdutos()
     {
-        $this->logger->writeLog( "Iniciando a importação de produtos..." . PHP_EOL);
+        $this->logger->info("Iniciando a importação de produtos...");
         $this->dbbonerp->trans_start();
         
         $l = $this->ektproduto_model->findByMesano($this->mesano);
@@ -166,27 +170,27 @@ class ImportarProdutos extends CI_Controller
         // $l = $this->dbekt->query("SELECT * FROM ekt_produto WHERE reduzido = 4521 AND mesano = ?", array($this->mesano))->result_array();
         
         $total = count($l);
-        $this->logger->writeLog( " >>>>>>>>>>>>>>>>>>>> " . $total . " produto(s) encontrado(s)." . PHP_EOL);
+        $this->logger->info(" >>>>>>>>>>>>>>>>>>>> " . $total . " produto(s) encontrado(s).");
         
         $i = 0;
         foreach ($l as $ektProduto) {
             if ($ektProduto['REDUZIDO'] == 88888) {
                 continue;
             }
-            $this->logger->writeLog( " >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> " . ++ $i . "/" . $total . PHP_EOL);
+            $this->logger->debug(" >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> " . ++ $i . "/" . $total);
             $this->importarProduto($ektProduto);
         }
         
-        $this->logger->writeLog( "Finalizando... commitando a transação..." . PHP_EOL);
+        $this->logger->info("Finalizando... commitando a transação...");
         
         $this->dbbonerp->trans_complete();
         
-        $this->logger->writeLog( "OK!!!" . PHP_EOL);
+        $this->logger->info("OK!!!");
     }
 
     private function importarProduto($ektProduto)
     {
-        $this->logger->writeLog( ">>>>>>>>>>>>> Trabalhando com " . $ektProduto['REDUZIDO'] . " - [" . $ektProduto['DESCRICAO'] . "]" . PHP_EOL);
+        $this->logger->debug(">>>>>>>>>>>>> Trabalhando com " . $ektProduto['REDUZIDO'] . " - [" . $ektProduto['DESCRICAO'] . "]");
         // Verifica produtos com mesmo reduzidoEKT
         $produtosComMesmoReduzidoEKT = $this->produto_model->findByReduzidoEkt($ektProduto['REDUZIDO'], null);
         
@@ -194,13 +198,13 @@ class ImportarProdutos extends CI_Controller
         
         // Se não tem nenhum produto com o mesmo reduzido, só insere.
         if ($qtdeComMesmoReduzido == 0) {
-            $this->logger->writeLog( "Produto novo. Inserindo..." . PHP_EOL);
+            $this->logger->debug("Produto novo. Inserindo...");
             $this->saveProduto($ektProduto, null);
             $this->inseridos ++;
-            $this->logger->writeLog( "OK!!!" . PHP_EOL);
+            $this->logger->debug("OK!!!");
         } else {
             $achouMesmo = false;
-            $this->logger->writeLog( $qtdeComMesmoReduzido . " produto(s) com o mesmo reduzido. Tentando encontrar o mesmo..." . PHP_EOL);
+            $this->logger->debug($qtdeComMesmoReduzido . " produto(s) com o mesmo reduzido. Tentando encontrar o mesmo...");
             // Começa a procurar o mesmo produto
             foreach ($produtosComMesmoReduzidoEKT as $mesmoReduzido) {
                 
@@ -213,7 +217,7 @@ class ImportarProdutos extends CI_Controller
                 // if ( $percent >= 0.75 or (! $mesmoReduzido['reduzido_ekt_ate']) and $mesmoReduzido['reduzido_ekt_desde'] == $this->dtMesImport) {
                 if ($descricao_ekt == $descricao) {
                     // PRODUTO JÁ EXISTENTE
-                    $this->logger->writeLog( "Achou o mesmo. Atualizando..." . PHP_EOL);
+                    $this->logger->debug("Achou o mesmo. Atualizando...");
                     $achouMesmo = true;
                     $this->saveProduto($ektProduto, $mesmoReduzido);
                     $mesmoReduzido = $this->produto_model->findby_id($mesmoReduzido['id']); // recarrego para pegar oq foi alterado
@@ -225,23 +229,24 @@ class ImportarProdutos extends CI_Controller
                     $qtdeTotal_ektProduto = $this->getQtdeTotalEktProduto($ektProduto);
                     $qtdeTotal_produto = $this->getQtdeTotalProduto($mesmoReduzido);
                     if ($qtdeTotal_ektProduto != $qtdeTotal_produto) {
-                        die("Qtde diferem para produtoId=[" . $mesmoReduzido['id'] . "] Reduzido:[" . $ektProduto['REDUZIDO'] . "]" . PHP_EOL . PHP_EOL . PHP_EOL);
+                        $this->logger->info("Qtde diferem para produtoId=[" . $mesmoReduzido['id'] . "] Reduzido:[" . $ektProduto['REDUZIDO'] . "]");
+                        return;
                     }
                     
                     $this->acertaPeriodosReduzidoEKT($mesmoReduzido);
                     
                     $this->atualizados ++;
                     
-                    $this->logger->writeLog( "OK!!!" . PHP_EOL);
+                    $this->logger->debug("OK!!!");
                     break; // já achou, não precisa continuar procurando
                 }
             }
             if (! $achouMesmo) {
-                $this->logger->writeLog( "Não achou o mesmo. Salvando um novo produto..." . PHP_EOL);
+                $this->logger->debug("Não achou o mesmo. Salvando um novo produto...");
                 $produto = $this->saveProduto($ektProduto, null);
                 $this->saveGrade($ektProduto, $produto);
                 $this->acertaPeriodosReduzidoEKT($produto);
-                $this->logger->writeLog( "OK!!!" . PHP_EOL);
+                $this->logger->debug("OK!!!");
             }
         }
     }
@@ -261,7 +266,8 @@ class ImportarProdutos extends CI_Controller
             $reduzid_bonerp = substr($produto['reduzido'], strlen($produto['reduzido']) - 5);
             
             if ($reduzido_ekt != $reduzid_bonerp) {
-                die("Problema com reduzido... bonerp: [" . $produto['reduzido'] . "]. EKT: [" . $ektProduto['REDUZIDO'] . "]" . PHP_EOL . PHP_EOL . PHP_EOL);
+                $this->logger->info("Problema com reduzido... bonerp: [" . $produto['reduzido'] . "]. EKT: [" . $ektProduto['REDUZIDO'] . "]");
+                return;
             } else {
                 return $produto['reduzido'];
             }
@@ -287,15 +293,32 @@ class ImportarProdutos extends CI_Controller
 
     private function saveProduto($ektProduto, $produto = null)
     {
-        $produto['depto_imp_id'] = $this->findDeptoBycodigo($ektProduto['DEPTO']) or die("Depto não encontrado [" . $ektProduto['DEPTO'] . "]" . PHP_EOL . PHP_EOL . PHP_EOL);
-        $produto['subdepto_id'] = $this->findSubdeptoBycodigo($ektProduto['SUBDEPTO']) or die("Subdepto não encontrado [" . $ektProduto['SUBDEPTO'] . "]" . PHP_EOL . PHP_EOL . PHP_EOL);
+        $produto['depto_imp_id'] = $this->findDeptoBycodigo($ektProduto['DEPTO']);
+        if (! $produto['depto_imp_id']) {
+            throw new Exception("Depto não encontrado [" . $ektProduto['DEPTO'] . "]");
+        }
+        
+        $produto['subdepto_id'] = $this->findSubdeptoBycodigo($ektProduto['SUBDEPTO']);
+        if (! $produto['subdepto_id']) {
+            throw new Exception("Subdepto não encontrado [" . $ektProduto['SUBDEPTO'] . "]");
+        }
+        
         $produto['subdepto_err'] = $this->findSubdeptoBycodigo($ektProduto['SUBDEPTO']);
-        $fornecedor_id = $this->fornecedor_model->findByCodigoEkt($ektProduto['FORNEC'], $this->mesano) or die("Fornecedor não encontrado: [" . $ektProduto['FORNEC'] . "] no mesano [" . $this->mesano . "]" . PHP_EOL . PHP_EOL . PHP_EOL);
+        
+        $fornecedor_id = $this->fornecedor_model->findByCodigoEkt($ektProduto['FORNEC'], $this->mesano);
+        if (! $fornecedor_id) {
+            throw new Exception("Fornecedor não encontrado: [" . $ektProduto['FORNEC'] . "] no mesano [" . $this->mesano . "]");
+        }
         $produto['fornecedor_id'] = $fornecedor_id;
         
         $produto['descricao'] = $ektProduto['DESCRICAO'];
         $produto['dt_ult_venda'] = $ektProduto['DATA_ULT_VENDA'];
-        $produto['grade_id'] = $this->findGradeByCodigo($ektProduto['GRADE']) or die("Grade não encontrada [" . $ektProduto['GRADE'] . "]" . PHP_EOL . PHP_EOL . PHP_EOL);
+        
+        $produto['grade_id'] = $this->findGradeByCodigo($ektProduto['GRADE']);
+        if (! $produto['grade_id']) {
+            throw new Exception("Grade não encontrada [" . $ektProduto['GRADE'] . "]");
+        }
+        
         $produto['grade_err'] = $ektProduto['GRADE'];
         
         $produto['reduzido'] = $this->handleReduzido($ektProduto, $produto);
@@ -308,7 +331,11 @@ class ImportarProdutos extends CI_Controller
         
         $produto['referencia'] = $ektProduto['REFERENCIA'];
         
-        $produto['unidade_produto_id'] = $this->findUnidadeByLabel($ektProduto['UNIDADE']) or die("Unidade não encontrada: [" . $ektProduto['UNIDADE'] . "]" . PHP_EOL . PHP_EOL . PHP_EOL);
+        $produto['unidade_produto_id'] = $this->findUnidadeByLabel($ektProduto['UNIDADE']);
+        
+        if (!$produto['unidade_produto_id']) {
+            throw new Exception("Unidade não encontrada: [" . $ektProduto['UNIDADE'] . "]");
+        }
         $produto['unidade_produto_err'] = $ektProduto['UNIDADE'];
         
         $produto['cst'] = 102;
@@ -317,15 +344,15 @@ class ImportarProdutos extends CI_Controller
         $produto['ncm'] = $ektProduto['NCM'] ? $ektProduto['NCM'] : "62179000";
         $produto['fracionado'] = $ektProduto['FRACIONADO'] == 'S' ? true : false;
         
-        $this->logger->writeLog( " ________________________ save PRODUTO " . PHP_EOL);
+        $this->logger->debug(" ________________________ save PRODUTO ");
         $produto_id = $this->produto_model->save($produto);
         $produto['id'] = $produto_id;
-        $this->logger->writeLog( " ________________________ OK. id do produto [" . $produto_id . "]" . PHP_EOL);
+        $this->logger->debug(" ________________________ OK. id do produto [" . $produto_id . "]");
         
         // Se é uma atualização de produto, verifica se o preço foi alterado
         if ($produto['id']) {
             
-            $this->logger->writeLog( "Verificando se já tem o preço cadastrado na est_produto_preco..." . PHP_EOL);
+            $this->logger->debug("Verificando se já tem o preço cadastrado na est_produto_preco...");
             
             $params = array();
             $params[] = $produto_id;
@@ -340,14 +367,14 @@ class ImportarProdutos extends CI_Controller
             $mesmo = $this->dbbonerp->query($sql, $params)->result_array();
             
             if (! $mesmo) {
-                $this->logger->writeLog( "Não tem... salvando o preço..." . PHP_EOL);
+                $this->logger->debug("Não tem... salvando o preço...");
                 $this->savePreco($ektProduto, $produto_id);
             }
         } else {
-            $this->logger->writeLog( "Inserindo o preço..." . PHP_EOL);
+            $this->logger->debug("Inserindo o preço...");
             $this->savePreco($ektProduto, $produto_id);
         }
-        $this->logger->writeLog( "OK!!!" . PHP_EOL);
+        $this->logger->debug("OK!!!");
         
         return $produto;
     }
@@ -375,21 +402,21 @@ class ImportarProdutos extends CI_Controller
      */
     private function saveGrade($ektProduto, $produto)
     {
-        $this->logger->writeLog( ">>>>>>>>>>>>>>>>> SALVANDO GRADE PRODUTO..." . PHP_EOL);
+        $this->logger->debug(">>>>>>>>>>>>>>>>> SALVANDO GRADE PRODUTO...");
         
         $saldos = $this->dbbonerp->query("SELECT count(*) as qtde FROM est_produto_saldo WHERE produto_id = ?", array(
             $produto['id']
         ))->result_array();
         
         if (count($saldos) > 0 && $saldos[0]['qtde'] > 0) {
-            die("Já tem saldo [" . $produto['descricao'] . "] e não deveria por causa do truncate do começo." . PHP_EOL . PHP_EOL . PHP_EOL);
+            throw new Exception("Já tem saldo [" . $produto['descricao'] . "] e não deveria por causa do truncate do começo.");
         }
         
         $qryQtdeTamanhos = $this->dbbonerp->query("SELECT count(*) as qtde FROM est_grade_tamanho WHERE grade_id = ?", array(
             $produto['grade_id']
         ))->result_array();
         if (! $qryQtdeTamanhos[0] or ! $qryQtdeTamanhos[0]['qtde']) {
-            die("Erro ao pesquisar tamanhos para a grade " . $produto['grade_id'] . PHP_EOL . PHP_EOL . PHP_EOL);
+            throw new Exception("Erro ao pesquisar tamanhos para a grade " . $produto['grade_id']);
         }
         $qtdeTamanhos = $qryQtdeTamanhos[0]['qtde'];
         
@@ -442,7 +469,7 @@ class ImportarProdutos extends CI_Controller
         }
         
         if ($acumulado > 0) {
-            $this->logger->writeLog( "Produto com qtdes em posições fora da grade. Acumulado: [" . $acumulado . "]" . PHP_EOL);
+            $this->logger->debug("Produto com qtdes em posições fora da grade. Acumulado: [" . $acumulado . "]");
         }
         
         for ($i = 1; $i <= 12; $i ++) {
@@ -450,7 +477,7 @@ class ImportarProdutos extends CI_Controller
             $acumulado = 0.0; // já salvou, não precisa mais
         }
         
-        $this->logger->writeLog( ">>>>>>>>>>>>>>>>> OK " . PHP_EOL);
+        $this->logger->debug(">>>>>>>>>>>>>>>>> OK ");
     }
 
     private function handleProdutoSaldo($ektProduto, $produto, $ordem, $acumulado)
@@ -462,7 +489,7 @@ class ImportarProdutos extends CI_Controller
         $qtde += $acumulado;
         
         if ($qtde != 0.0) {
-            $this->logger->writeLog( ">>>>>>>>>>>>>>>>> handleProdutoSaldo - " . $ordem . PHP_EOL);
+            $this->logger->debug(">>>>>>>>>>>>>>>>> handleProdutoSaldo - " . $ordem);
             
             $qryGt = $this->dbbonerp->query("SELECT gt.id FROM est_grade_tamanho gt, est_grade g WHERE gt.grade_id = g.id AND g.codigo = ? AND gt.ordem = ?", array(
                 $ektProduto['GRADE'],
@@ -470,7 +497,7 @@ class ImportarProdutos extends CI_Controller
             ))->result_array();
             
             if (count($qryGt) != 1) {
-                die("Erro ao pesquisar grade. Reduzido: [" . $ektProduto['REDUZIDO'] . "]. Código: [" . $ektProduto['GRADE'] . "]. Ordem: [" . $ordem . "]" . PHP_EOL . PHP_EOL . PHP_EOL);
+                throw new Exception("Erro ao pesquisar grade. Reduzido: [" . $ektProduto['REDUZIDO'] . "]. Código: [" . $ektProduto['GRADE'] . "]. Ordem: [" . $ordem . "]");
             }
             $gt = $qryGt[0];
             
@@ -481,18 +508,18 @@ class ImportarProdutos extends CI_Controller
             
             $this->produtosaldo_model->save($produtoSaldo) or $this->exit_db_error("Erro ao salvar na est_produto_saldo para o produto id [" . $produto['id'] . "]");
             
-            $this->logger->writeLog( ">>>>>>>>>>>>>>>>> OK" . PHP_EOL);
+            $this->logger->debug(">>>>>>>>>>>>>>>>> OK");
         }
     }
 
     private function acertaPeriodosReduzidoEKT($produtoBonERP)
     {
-        $this->logger->writeLog( ">>>>>>>> ACERTANDO REDUZIDOS EKT: " . $produtoBonERP['reduzido_ekt'] . PHP_EOL);
+        $this->logger->debug(">>>>>>>> ACERTANDO REDUZIDOS EKT: " . $produtoBonERP['reduzido_ekt']);
         
         $corrigiu_algo_aqui = false;
         $produtoId = $produtoBonERP['id'];
         $reduzido_ekt = $produtoBonERP['reduzido_ekt'];
-        $this->logger->writeLog( "LIDANDO COM 'depara' [" . $produtoId . "]... " . PHP_EOL);
+        $this->logger->debug("LIDANDO COM 'depara' [" . $produtoId . "]... ");
         
         $sql = "SELECT * FROM est_produto_reduzidoektmesano WHERE produto_id = ? AND mesano = ? AND reduzido_ekt = ?";
         $params = array(
@@ -555,7 +582,7 @@ class ImportarProdutos extends CI_Controller
     private function getQtdeTotalProduto($produto)
     {
         if (! $produto) {
-            $this->logger->writeLog( "PRODUTO == NULL ?????? " . PHP_EOL);
+            $this->logger->debug("PRODUTO == NULL ?????? ");
             return null;
         }
         $qtdeTotal = 0;
@@ -576,13 +603,13 @@ class ImportarProdutos extends CI_Controller
     private function marcarProdutosInativos()
     {
         // try {
-        $this->logger->writeLog( ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> marcarProdutosInativos" . PHP_EOL . PHP_EOL);
+        $this->logger->info(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> marcarProdutosInativos");
         
         $sql = "SELECT id, reduzido_ekt FROM est_produto WHERE reduzido_ekt_ate IS NULL";
         $qryProds = $this->dbbonerp->query($sql);
         $prods = $qryProds->result_array();
         
-        $this->logger->writeLog( "Produtos encontrados: " . count($prods) . PHP_EOL . PHP_EOL);
+        $this->logger->info("Produtos encontrados: " . count($prods));
         
         $i = 0;
         
@@ -592,12 +619,12 @@ class ImportarProdutos extends CI_Controller
             $produtoId = $p['id'];
             $reduzidoEkt = $p['reduzido_ekt'];
             
-            $this->logger->writeLog( "PESQUISANDO produtoId: " . $produtoId . " - reduzidoEkt: " . $reduzidoEkt . PHP_EOL);
+            $this->logger->debug("PESQUISANDO produtoId: " . $produtoId . " - reduzidoEkt: " . $reduzidoEkt);
             
             $ektProduto = $ektproduto_model->findByReduzido($reduzidoEkt, $mesImport);
             
             if (! $ektProduto == null) {
-                $this->logger->writeLog( "Produto: " . $reduzidoEkt . " não encontrado" . PHP_EOL);
+                $this->logger->debug("Produto: " . $reduzidoEkt . " não encontrado");
                 $produto = $this->produto_model->findById($produtoId);
                 
                 $dtMesImport = clone $this->dtMesImport;
@@ -612,7 +639,7 @@ class ImportarProdutos extends CI_Controller
             }
         }
         
-        $this->logger->writeLog( $i + " produto(s) foram 'inativados'" . PHP_EOL);
+        $this->logger->info($i + " produto(s) foram 'inativados'");
     }
 
     private function deletarSaldos()
@@ -629,7 +656,7 @@ class ImportarProdutos extends CI_Controller
             return;
         }
         if ($dtIni == null) {
-            die("dtini null" . PHP_EOL . PHP_EOL . PHP_EOL);
+            throw new Exception("dtini null");
         }
         if ($dtFim == null) {
             return;
@@ -745,14 +772,12 @@ class ImportarProdutos extends CI_Controller
      * @param
      *            $mesano
      */
-    public function corrigir_precos($mesano)
+    private function corrigirPrecos()
     {
-        $time_start = microtime(true);
-        
         $this->dbbonerp->trans_start();
         
         $query = $this->dbbonerp->get_where("ekt_produto", array(
-            'mesano' => $mesano
+            'mesano' => $this->mesano
         ));
         $result = $query->result_array();
         
@@ -761,10 +786,10 @@ class ImportarProdutos extends CI_Controller
         foreach ($result as $r) {
             try {
                 // Para cada ekt_produto, encontra o est_produto
-                $produto = $this->findByReduzidoEkt($r['REDUZIDO'], $mesano)[0];
+                $produto = $this->findByReduzidoEkt($r['REDUZIDO'], $this->mesano)[0];
                 // Adiciona o preço
-                $this->logger->writeLog( $i ++ . " (" . $r['id'] . ")" . PHP_EOL);
-                $this->salvarProdutoPreco($r, $produto['id'], $mesano);
+                $this->logger->info($i ++ . " (" . $r['id'] . ")");
+                $this->salvarProdutoPreco($r, $produto['id'], $this->mesano);
             } catch (Exception $e) {
                 print_r($e->getMessage());
                 exit();
@@ -773,21 +798,10 @@ class ImportarProdutos extends CI_Controller
         
         $this->dbbonerp->trans_complete();
         
-        $this->logger->writeLog( PHP_EOL . PHP_EOL . PHP_EOL);
-        $this->logger->writeLog( "--------------------------------------------------------------" . PHP_EOL);
-        $this->logger->writeLog( "--------------------------------------------------------------" . PHP_EOL);
-        $this->logger->writeLog( "--------------------------------------------------------------" . PHP_EOL);
-        $this->logger->writeLog( "INSERIDOS: " . $this->inseridos . PHP_EOL);
-        $this->logger->writeLog( "ATUALIZADOS: " . $this->atualizados . PHP_EOL);
-        $this->logger->writeLog( "ACERTADOS DEPARA: " . $this->acertados_depara . PHP_EOL);
-        
-        $time_end = microtime(true);
-        $execution_time = ($time_end - $time_start);
-        $this->logger->writeLog( PHP_EOL . PHP_EOL . PHP_EOL);
-        $this->logger->writeLog( "----------------------------------" . PHP_EOL);
-        $this->logger->writeLog( "Total Execution Time: " . $execution_time . "s" . PHP_EOL . PHP_EOL . PHP_EOL);
-        $this->logger->closeLog();
-        $this->logger->sendMail();
+        $this->logger->info(PHP_EOL);
+        $this->logger->info("--------------------------------------------------------------");
+        $this->logger->info("--------------------------------------------------------------");
+        $this->logger->info("--------------------------------------------------------------");
     }
 
     private function salvarProdutoPreco($produtoEkt, $produtoId, $mesano)
@@ -842,7 +856,6 @@ class ImportarProdutos extends CI_Controller
     }
 
     /**
-     *
      */
     private function findByReduzidoEkt($reduzidoEkt, $mesano = null)
     {
@@ -872,13 +885,8 @@ class ImportarProdutos extends CI_Controller
     private function gerarProdutoSaldoHistorico()
     {
         $this->dbbonerp->trans_start();
-        
-        $this->dtMesano = DateTime::createFromFormat('Ymd', $this->mesano . "01");
-        if (! $this->dtMesano instanceof DateTime) {
-            die("mesano inválido." . PHP_EOL . PHP_EOL . PHP_EOL);
-        }
-        
-        $this->logger->writeLog( "Iniciando gerarProdutoSaldoHistorico() para mesano = '" . $this->mesano . "'" . PHP_EOL . PHP_EOL);
+
+        $this->logger->info("Iniciando gerarProdutoSaldoHistorico() para mesano = '" . $this->mesano . "'");
         
         $this->dbbonerp->query("DELETE FROM est_produto_saldo_historico WHERE DATE_FORMAT(mesano, '%Y%m') = ?", array(
             $this->mesano
@@ -904,7 +912,8 @@ class ImportarProdutos extends CI_Controller
         ))->result_array();
         
         if (count($r_prods) != $total) {
-            die("qtde de produtos diferem. EKT: [" . $total . "] est_produto_reduzidoektmesano: [" . count($r_prods) . "]" . PHP_EOL . PHP_EOL . PHP_EOL);
+            $this->logger->info("qtde de produtos diferem. EKT: [" . $total . "] est_produto_reduzidoektmesano: [" . count($r_prods) . "]");
+            return;
         }
         
         $prods = array();
@@ -913,7 +922,7 @@ class ImportarProdutos extends CI_Controller
         }
         
         foreach ($ekts as $ekt) {
-            $this->logger->writeLog( " >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> " . ++ $i . "/" . $total . PHP_EOL);
+            $this->logger->debug(" >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> " . ++ $i . "/" . $total);
             
             $produto_id = $prods[$ekt['REDUZIDO']];
             
@@ -932,7 +941,7 @@ class ImportarProdutos extends CI_Controller
         
         $qry = $this->dbbonerp->query("CALL sp_total_inventario(?,@a,@b,@c)", array(
             $this->mesano
-        )) or die("Query fail: " . PHP_EOL . PHP_EOL . PHP_EOL);
+        ));
         $result = $qry->result_array();
         mysqli_next_result($this->dbbonerp->conn_id);
         $qry->free_result();
@@ -942,25 +951,25 @@ class ImportarProdutos extends CI_Controller
             $totalPrecosPrazo = $result[0]['total_precos_prazo'];
             $totalPecas = $result[0]['total_pecas'];
             
-            $this->logger->writeLog( "--------------------------------------------------------------" . PHP_EOL);
-            $this->logger->writeLog( "Total Custo: " . $totalCustos . PHP_EOL);
-            $this->logger->writeLog( "Total Venda: " . $totalPrecosPrazo . PHP_EOL);
-            $this->logger->writeLog( "Total Pecas: " . $totalPecas . PHP_EOL);
-            $this->logger->writeLog( "--------------------------------------------------------------" . PHP_EOL . PHP_EOL);
+            $this->logger->info("--------------------------------------------------------------");
+            $this->logger->info("Total Custo: " . $totalCustos);
+            $this->logger->info("Total Venda: " . $totalPrecosPrazo);
+            $this->logger->info("Total Pecas: " . $totalPecas);
+            $this->logger->info("--------------------------------------------------------------");
             
             $this->handleRegistroConferencia("INVENT PECAS (IMPORTADO)", $this->dtMesano->format('Y-m-t'), $totalPecas);
             $this->handleRegistroConferencia("INVENT CUSTO (IMPORTADO)", $this->dtMesano->format('Y-m-t'), $totalCustos);
             $this->handleRegistroConferencia("INVENT VENDA (IMPORTADO)", $this->dtMesano->format('Y-m-t'), $totalPrecosPrazo);
         }
         
-        $this->logger->writeLog( "Finalizando... commitando a transação..." . PHP_EOL);
+        $this->logger->info("Finalizando... commitando a transação...");
         
         $this->dbbonerp->trans_complete();
     }
 
     private function handleRegistroConferencia($descricao, $dtMesano, $valor)
     {
-        $this->logger->writeLog( "handleRegistroConferencia - [" . $descricao . "]" . PHP_EOL);
+        $this->logger->info("handleRegistroConferencia - [" . $descricao . "]");
         $params = array(
             $descricao,
             $dtMesano
@@ -977,16 +986,16 @@ class ImportarProdutos extends CI_Controller
         $model = new \CIBases\Models\DAO\Base\Base_model('fin_reg_conf', 'bonerp');
         $model->setDb($this->dbbonerp);
         $model->save($reg);
-        $this->logger->writeLog( "OK!!!" . PHP_EOL);
-    }   
+        $this->logger->info("OK!!!");
+    }
 
     private function exit_db_error($msg = null)
     {
-        $this->logger->writeLog( str_pad("", 100, "*") . PHP_EOL);
-        $this->logger->writeLog( $msg ? $msg . PHP_EOL : '');
-        $this->logger->writeLog( "LAST QUERY: " . $this->dbbonerp->last_query() . PHP_EOL . PHP_EOL);
-        print_r($this->dbbonerp->error()) . PHP_EOL . PHP_EOL;
-        $this->logger->writeLog( str_pad("", 100, "*") . PHP_EOL);
+        $this->logger->info(str_pad("", 100, "*"));
+        $this->logger->info($msg ? $msg : '');
+        $this->logger->info("LAST QUERY: " . $this->dbbonerp->last_query());
+        print_r($this->dbbonerp->error());
+        $this->logger->info(str_pad("", 100, "*"));
         exit();
     }
 
@@ -997,7 +1006,7 @@ class ImportarProdutos extends CI_Controller
     {
         $time_start = microtime(true);
         
-        $this->logger->writeLog( "Iniciando a correção de reduzidos..." . PHP_EOL);
+        $this->logger->info("Iniciando a correção de reduzidos...");
         
         $this->dbbonerp->trans_start();
         
@@ -1005,7 +1014,7 @@ class ImportarProdutos extends CI_Controller
         $total = count($r);
         $i = 0;
         foreach ($r as $produto) {
-            $this->logger->writeLog( " >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> " . ++ $i . "/" . $total . PHP_EOL);
+            $this->logger->debug(" >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> " . ++ $i . "/" . $total);
             $reduzido = $produto['reduzido'];
             if ($reduzido != 88888) {
                 if ($reduzido[0] == 9)
@@ -1033,15 +1042,15 @@ class ImportarProdutos extends CI_Controller
                 }
             }
         }
-        $this->logger->writeLog( "Finalizando... commitando a transação..." . PHP_EOL);
+        $this->logger->info("Finalizando... commitando a transação...");
         
         $this->dbbonerp->trans_complete();
         
         $time_end = microtime(true);
         $execution_time = ($time_end - $time_start);
-        $this->logger->writeLog( PHP_EOL . PHP_EOL . PHP_EOL);
-        $this->logger->writeLog( "----------------------------------" . PHP_EOL);
-        $this->logger->writeLog( "Total Execution Time: " . $execution_time . "s" . PHP_EOL . PHP_EOL . PHP_EOL);
+        $this->logger->info(PHP_EOL);
+        $this->logger->info("----------------------------------");
+        $this->logger->info("Total Execution Time: " . $execution_time . "s");
         $this->logger->closeLog();
         $this->logger->sendMail();
     }
@@ -1064,7 +1073,8 @@ class ImportarProdutos extends CI_Controller
             ))->result_array();
             
             if (! $ekts or count($ekts) < 1) {
-                die("est_produto_reduzidoektmesano não encontrado para est_produto.id = [" . $prod['id'] . "]" . PHP_EOL);
+                $this->logger->info("est_produto_reduzidoektmesano não encontrado para est_produto.id = [" . $prod['id'] . "]");
+                return;
             }
             
             $desde = DateTime::createFromFormat('Ym', $ekts[0]['mesano'])->format('Y-m-') . "01";
@@ -1077,10 +1087,10 @@ class ImportarProdutos extends CI_Controller
                 'id' => $prod['id']
             )) or $this->exit_db_error("Erro ao atualizar 'reduzido_ekt_desde'");
             
-            $this->logger->writeLog( " >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> " . ++ $i . "/" . $total . PHP_EOL);
+            $this->logger->debug(" >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> " . ++ $i . "/" . $total);
         }
         
-        $this->logger->writeLog( "Finalizando... commitando a transação..." . PHP_EOL);
+        $this->logger->info("Finalizando... commitando a transação...");
         
         $this->dbbonerp->trans_complete();
     }

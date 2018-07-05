@@ -102,10 +102,10 @@ class ImportarEkt2Espelhos extends CI_Controller
         
         $this->logger = new LogWriter($logPath, $prefix);
         
-        $this->logger->writeLog("Iniciando a importação para o mês/ano: [" . $mesano . "]" . PHP_EOL);
+        $this->logger->info("Iniciando a importação para o mês/ano: [" . $mesano . "]");
         
-        $this->logger->writeLog("csvsPath: [" . $this->csvsPath . "]" . PHP_EOL);
-        $this->logger->writeLog("logPath: [" . $logPath . "]" . PHP_EOL);
+        $this->logger->info("csvsPath: [" . $this->csvsPath . "]");
+        $this->logger->info("logPath: [" . $logPath . "]");
         
         $tiposImportacoes = explode("-", $importadores);
         
@@ -118,7 +118,7 @@ class ImportarEkt2Espelhos extends CI_Controller
                 'VEN',
                 'ENC'
             ))) {
-                $this->logger->writeLog("Tipo de importação inválido: [" . $tipo . "]");
+                $this->logger->info("Tipo de importação inválido: [" . $tipo . "]");
             }
         }
         
@@ -147,9 +147,9 @@ class ImportarEkt2Espelhos extends CI_Controller
         
         $time_end = microtime(true);
         $execution_time = ($time_end - $time_start);
-        $this->logger->writeLog(PHP_EOL . PHP_EOL . "----------------------------------\nTotal Execution Time: " . $execution_time . "s" . PHP_EOL);
-        $this->logger->closeLog();
+        $this->logger->info(PHP_EOL . PHP_EOL . "---------------------------------- Total Execution Time: " . $execution_time . "s");
         $this->logger->sendMail();
+        $this->logger->closeLog();
     }
 
     /*
@@ -159,18 +159,18 @@ class ImportarEkt2Espelhos extends CI_Controller
     {
         $this->dbekt->trans_start();
         
-        $this->logger->writeLog("IMPORTANDO DEPTOS..." . PHP_EOL . PHP_EOL);
+        $this->logger->info("IMPORTANDO DEPTOS...");
         
         if (! $this->dbekt->query("DELETE FROM ekt_depto WHERE mesano = ?", array(
             $this->mesano
         ))) {
-            log_message('error', 'DELETE FROM ekt_depto WHERE mesano = ?');
+            $this->logger->debug('DELETE FROM ekt_depto WHERE mesano = ?');
             return;
         }
         
         $linhas = file($this->csvsPath . "est_d003.csv");
         
-        $this->logger->writeLog(count($linhas) . " depto(s) encontrado(s)." . PHP_EOL . PHP_EOL);
+        $this->logger->info(count($linhas) . " depto(s) encontrado(s).");
         
         $i = 0;
         
@@ -181,7 +181,8 @@ class ImportarEkt2Espelhos extends CI_Controller
             $i ++;
             $campos = explode(";", $linha);
             if (count($campos) < 6) {
-                die("A linha deve ter 6 campos. LINHA: [" + $linha + "]");
+                $this->logger->info("A linha deve ter 6 campos. LINHA: [" + $linha + "]");
+                return;
             }
             
             $ektDepto = array();
@@ -204,13 +205,15 @@ class ImportarEkt2Espelhos extends CI_Controller
             $this->handleIudtUserInfo($ektDepto);
             
             if (! $this->dbekt->insert('ekt_depto', $ektDepto)) {
-                log_message('error', 'Erro ao salvar o ektDepto');
+                $this->logger->info('Erro ao salvar o ektDepto');
                 return;
             } else {
-                $this->logger->writeLog($i . " depto(s) inserido(s)." . PHP_EOL);
+                $this->logger->debug($i . " depto(s) inserido(s).");
             }
         }
         
+        $this->logger->info("OK!!!!");
+                
         $this->dbekt->trans_complete();
     }
 
@@ -221,12 +224,12 @@ class ImportarEkt2Espelhos extends CI_Controller
     {
         $this->dbekt->trans_start();
         
-        $this->logger->writeLog("IMPORTANDO SUBDEPTOS..." . PHP_EOL . PHP_EOL);
+        $this->logger->info("IMPORTANDO SUBDEPTOS...");
         
         if (! $this->dbekt->query("DELETE FROM ekt_subdepto WHERE mesano = ?", array(
             $this->mesano
         ))) {
-            log_message('error', 'DELETE FROM ekt_subdepto WHERE mesano = ?');
+            $this->logger->info('ERRO em DELETE FROM ekt_subdepto WHERE mesano = ?');
             return;
         }
         
@@ -241,7 +244,8 @@ class ImportarEkt2Espelhos extends CI_Controller
             $i ++;
             $campos = explode(";", $linha);
             if (count($campos) < 29) {
-                die("A linha deve ter 29 campos. LINHA: [" + $linha + "]");
+                $this->logger->debug("A linha deve ter 29 campos. LINHA: [" + $linha + "]");
+                exit;
             }
             
             $ektSubdepto = array();
@@ -311,12 +315,14 @@ class ImportarEkt2Espelhos extends CI_Controller
             $this->handleIudtUserInfo($ektSubdepto);
             
             if (! $this->dbekt->insert('ekt_subdepto', $ektSubdepto)) {
-                log_message('error', 'Erro ao salvar o ekt_subdepto');
+                $this->logger->info('Erro ao salvar o ekt_subdepto');
                 return;
             } else {
-                $this->logger->writeLog($i . " subdepto(s) inserido(s)." . PHP_EOL);
+                $this->logger->debug($i . " subdepto(s) inserido(s).");
             }
         }
+        
+        $this->logger->info("OK!!!!");
         
         $this->dbekt->trans_complete();
     }
@@ -325,7 +331,7 @@ class ImportarEkt2Espelhos extends CI_Controller
      */
     private function importarFornecedores()
     {
-        $this->logger->writeLog("IMPORTANDO FORNECEDORES..." . PHP_EOL . PHP_EOL);
+        $this->logger->info("IMPORTANDO FORNECEDORES...");
         
         $this->load->model('ekt/ektfornecedor_model');
         $model = $this->ektfornecedor_model;
@@ -334,7 +340,7 @@ class ImportarEkt2Espelhos extends CI_Controller
         $this->dbekt->trans_start();
         
         if (! $model->delete_by_mesano($this->mesano)) {
-            log_message('error', 'Erro em deleteByMesAno');
+            $this->logger->info('Erro em deleteByMesAno no importarFornecedores()');
             return;
         }
         
@@ -370,7 +376,7 @@ class ImportarEkt2Espelhos extends CI_Controller
         
         $linhas = file($this->csvsPath . "est_d002.csv");
         
-        $this->logger->writeLog("Linhas: " . count($linhas) . PHP_EOL . PHP_EOL);
+        $this->logger->info("Linhas: " . count($linhas));
         
         $i = 0;
         
@@ -381,7 +387,8 @@ class ImportarEkt2Espelhos extends CI_Controller
             $i ++;
             $campos = explode(";", $linha);
             if (count($campos) < 23) {
-                die("A linha deve ter 23 campos. LINHA: [" + $linha + "]");
+                $this->logger->debug("A linha deve ter 23 campos. LINHA: [" + $linha + "]");
+                return;
             }
             
             $ektFornecedor = array();
@@ -422,16 +429,17 @@ class ImportarEkt2Espelhos extends CI_Controller
             
             $this->handleIudtUserInfo($ektFornecedor);
             
-            $this->logger->writeLog("Inserindo..." . PHP_EOL);
+            $this->logger->debug("Inserindo...");
             
             if (! $this->dbekt->insert('ekt_fornecedor', $ektFornecedor)) {
-                $this->logger->writeLog("Erro ao inserir o fornecedor." . PHP_EOL);
-                log_message('error', 'Erro ao salvar o ektFornecedor');
+                $this->logger->info("Erro ao inserir o fornecedor. CODIGO = [" . $ektFornecedor['CODIGO'] . "]");
                 return;
             } else {
-                $this->logger->writeLog($i . " fornecedor(es) inserido(s)." . PHP_EOL);
+                $this->logger->debug($i . " fornecedor(es) inserido(s).");
             }
         }
+        
+        $this->logger->info("OK!!!!");
         
         $this->dbekt->trans_complete();
     }
@@ -442,14 +450,14 @@ class ImportarEkt2Espelhos extends CI_Controller
     {
         $this->dbekt->trans_start();
         
-        $this->logger->writeLog(PHP_EOL . PHP_EOL . "IMPORTANDO PRODUTOS..." . PHP_EOL . PHP_EOL);
+        $this->logger->info(PHP_EOL . PHP_EOL . "IMPORTANDO PRODUTOS...");
         
         $this->load->model('ekt/ektproduto_model');
         $model = $this->ektproduto_model;
         $model->setDb($this->dbekt);
         
         if (! $model->delete_by_mesano($this->mesano)) {
-            log_message('error', 'Erro em deleteByMesAno');
+            $this->logger->info('Erro em deleteByMesAno no importarProdutos()');
             return;
         }
         
@@ -561,12 +569,14 @@ class ImportarEkt2Espelhos extends CI_Controller
             $this->handleIudtUserInfo($ektProduto);
             
             if (! $this->dbekt->insert('ekt_produto', $ektProduto)) {
-                log_message('error', 'Erro ao salvar o ektProduto');
+                $this->logger->info('Erro ao salvar o ektProduto. REDUZIDO: [' . $ektProduto['REDUZIDO'] . "]");
                 return;
             } else {
-                $this->logger->writeLog($i . " produto(s) inserido(s)." . PHP_EOL);
+                $this->logger->debug($i . " produto(s) inserido(s).");
             }
         }
+        
+        $this->logger->info("OK!!!!");
         
         $this->dbekt->trans_complete();
     }
@@ -577,18 +587,20 @@ class ImportarEkt2Espelhos extends CI_Controller
     {
         $this->dbekt->trans_start();
         
-        $this->logger->writeLog(PHP_EOL . PHP_EOL . "IMPORTANDO VENDEDORES..." . PHP_EOL . PHP_EOL);
+        $this->logger->info(PHP_EOL . PHP_EOL . "IMPORTANDO VENDEDORES...");
         
         $model = new \CIBases\Models\DAO\Base\Base_model('ekt_vendedor', 'ekt');
         
         if (! $this->dbekt->query("DELETE FROM ekt_vendedor WHERE mesano = '" . $this->mesano . "'")) {
-            die("Erro ao deletar vendedores do mesano." . PHP_EOL . PHP_EOL);
+            $this->logger->info("Erro ao deletar vendedores do mesano.");
+            return;
         }
         
         $linhas = file($this->csvsPath . "est_d008.csv");
         
         if (! $linhas or count($linhas) < 0) {
-            die("importarVendedores() - Sem dados para importar");
+            $this->logger->info("importarVendedores() - Sem dados para importar");
+            return;
         }
         
         $i = 0;
@@ -614,12 +626,14 @@ class ImportarEkt2Espelhos extends CI_Controller
             $this->handleIudtUserInfo($ektVendedor);
             
             if (! $this->dbekt->insert('ekt_vendedor', $ektVendedor)) {
-                log_message('error', 'Erro ao salvar o ektVendedor');
+                $this->logger->info('Erro ao salvar o ektVendedor. CODIGO = [' . $ektVendedor['CODIGO'] . "]");
                 return;
             } else {
-                $this->logger->writeLog($i . " vendedor(es) inserido(s)." . PHP_EOL);
+                $this->logger->debug($i . " vendedor(es) inserido(s).");
             }
         }
+        
+        $this->logger->info("OK!!!!");
         
         $this->dbekt->trans_complete();
     }
@@ -630,21 +644,22 @@ class ImportarEkt2Espelhos extends CI_Controller
     {
         $this->dbekt->trans_start();
         
-        $this->logger->writeLog(PHP_EOL . PHP_EOL . "IMPORTANDO VENDAS..." . PHP_EOL . PHP_EOL);
+        $this->logger->info(PHP_EOL . PHP_EOL . "IMPORTANDO VENDAS...");
         
         $this->load->model('ekt/ektvenda_model');
         $model = $this->ektvenda_model;
         $model->setDb($this->dbekt);
         
         if (! $model->delete_by_mesano($this->mesano)) {
-            log_message('error', 'Erro em deleteByMesAno');
+            $this->logger->info('Erro em deleteByMesAno no importarVendas()');
             return;
         }
         
         $linhas = file($this->csvsPath . "ven_d060.csv");
         
         if (! $linhas or count($linhas) < 0) {
-            die("importarVendas() - Sem dados para importar");
+            $this->logger->info("importarVendas() - Sem dados para importar");
+            return;
         }
         
         $i = 0;
@@ -656,7 +671,8 @@ class ImportarEkt2Espelhos extends CI_Controller
             $i ++;
             $campos = explode(";", $linha);
             if (count($campos) < 44) {
-                die("A linha deve ter 44 campos. LINHA: [" + $linha + "]");
+                $this->logger->debug("A linha deve ter 44 campos. LINHA: [" + $linha + "]");
+                return;
             }
             
             $ektVenda = array();
@@ -710,12 +726,14 @@ class ImportarEkt2Espelhos extends CI_Controller
             $this->handleIudtUserInfo($ektVenda);
             
             if (! $this->dbekt->insert('ekt_venda', $ektVenda)) {
-                log_message('error', 'Erro ao salvar o ektVenda');
+                $this->logger->info("Erro ao salvar o ektVenda. PV = [" . $ektVenda['NUMERO'] . "]");
                 return;
             } else {
-                $this->logger->writeLog($i . " venda(s) inserida(s)." . PHP_EOL);
+                $this->logger->debug($i . " venda(s) inserida(s).");
             }
         }
+        
+        $this->logger->info("OK!!!!");
         
         $this->dbekt->trans_complete();
     }
@@ -726,21 +744,22 @@ class ImportarEkt2Espelhos extends CI_Controller
     {
         $this->dbekt->trans_start();
         
-        $this->logger->writeLog(PHP_EOL . PHP_EOL . "IMPORTANDO ITENS DAS VENDAS..." . PHP_EOL . PHP_EOL);
+        $this->logger->info(PHP_EOL . PHP_EOL . "IMPORTANDO ITENS DAS VENDAS...");
         
         $this->load->model('ekt/ektvendaitem_model');
         $model = $this->ektvendaitem_model;
         $model->setDb($this->dbekt);
         
         if (! $model->delete_by_mesano($this->mesano)) {
-            log_message('error', 'Erro em deleteByMesAno');
+            $this->logger->info("Erro em deleteByMesAno no importarVendasItens()");
             return;
         }
         
         $linhas = file($this->csvsPath . "ven_d061.csv");
         
         if (! $linhas or count($linhas) < 0) {
-            die("importarVendasItens() - Sem dados para importar");
+            $this->logger->info("importarVendasItens() - Sem dados para importar");
+            return;
         }
         
         $i = 0;
@@ -774,12 +793,14 @@ class ImportarEkt2Espelhos extends CI_Controller
             $this->handleIudtUserInfo($ektVendaItem);
             
             if (! $this->dbekt->insert('ekt_venda_item', $ektVendaItem)) {
-                log_message('error', 'Erro ao salvar o ektVendaItem');
+                $this->logger->info("Erro ao salvar o ektVendaItem. REDUZIDO = '" . $ektVendaItem['PRODUTO'] . "'");
                 return;
             } else {
-                $this->logger->writeLog($i . " item(ns) de venda inserido(s)." . PHP_EOL);
+                $this->logger->debug($i . " item(ns) de venda inserido(s).");
             }
         }
+        
+        $this->logger->info("OK!!!!");
         
         $this->dbekt->trans_complete();
     }
@@ -790,21 +811,22 @@ class ImportarEkt2Espelhos extends CI_Controller
     {
         $this->dbekt->trans_start();
         
-        $this->logger->writeLog(PHP_EOL . PHP_EOL . "IMPORTANDO PEDIDOS..." . PHP_EOL . PHP_EOL);
+        $this->logger->info(PHP_EOL . PHP_EOL . "IMPORTANDO PEDIDOS...");
         
         $this->load->model('ekt/ektpedido_model');
         $model = $this->ektpedido_model;
         $model->setDb($this->dbekt);
         
         if (! $model->truncate_table()) {
-            log_message('error', 'Erro em truncate table');
+            $this->logger->info("Erro em truncate table");
             return;
         }
         
         $linhas = file($this->csvsPath . "ped_d020.csv");
         
         if (! $linhas or count($linhas) < 0) {
-            die("importarPedidos() - Sem dados para importar");
+            $this->logger->debug("importarPedidos() - Sem dados para importar");
+            return;
         }
         
         $i = 0;
@@ -826,13 +848,6 @@ class ImportarEkt2Espelhos extends CI_Controller
             }
             
             $pedido = $campos[1];
-            
-            // Verifica se já existe para não reimportar.
-            // $jaExiste = $model->findby_pedido($pedido);
-            // if ($jaExiste) {
-            // $this->logger->writeLog("PEDIDO $pedido já existente na base." . PHP_EOL);
-            // continue;
-            // }
             
             $ektPedido['RECORD_NUMBER'] = $i;
             $ektPedido['PEDIDO'] = $pedido;
@@ -862,12 +877,14 @@ class ImportarEkt2Espelhos extends CI_Controller
             $this->handleIudtUserInfo($ektPedido);
             
             if (! $this->dbekt->insert('ekt_pedido', $ektPedido)) {
-                log_message('error', 'Erro ao salvar o ektPedido');
+                $this->logger->info("Erro ao salvar o ektPedido. PEDIDO = [" . $ektPedido['PEDIDO'] . "]");
                 return;
             } else {
-                $this->logger->writeLog($i . " pedido(s) inserido(s)." . PHP_EOL);
+                $this->logger->debug($i . " pedido(s) inserido(s).");
             }
         }
+        
+        $this->logger->info("OK!!!!");
         
         $this->dbekt->trans_complete();
     }
@@ -878,21 +895,22 @@ class ImportarEkt2Espelhos extends CI_Controller
     {
         $this->dbekt->trans_start();
         
-        $this->logger->writeLog(PHP_EOL . PHP_EOL . "IMPORTANDO ENCOMENDAS..." . PHP_EOL . PHP_EOL);
+        $this->logger->info(PHP_EOL . PHP_EOL . "IMPORTANDO ENCOMENDAS...");
         
         $this->load->model('ekt/ektencomenda_model');
         $model = $this->ektencomenda_model;
         $model->setDb($this->dbekt);
         
         if (! $model->truncate_table()) {
-            log_message('error', 'Erro em truncate table');
+            $this->logger->info("Erro em truncate table no importarEncomendas()");
             return;
         }
         
         $linhas = file($this->csvsPath . "ped_d070.csv");
         
         if (! $linhas or count($linhas) < 0) {
-            die("importarEncomendas() - Sem dados para importar");
+            $this->logger->debug("importarEncomendas() - Sem dados para importar");
+            return;
         }
         
         $i = 0;
@@ -947,12 +965,14 @@ class ImportarEkt2Espelhos extends CI_Controller
             $this->handleIudtUserInfo($ektEncomenda);
             
             if (! $this->dbekt->insert('ekt_encomenda', $ektEncomenda)) {
-                log_message('error', 'Erro ao salvar o ektEncomenda');
+                $this->logger->info('Erro ao salvar o ektEncomenda. NUMERO = [' . $ektEncomenda['NUMERO'] . "]");
                 return;
             } else {
-                $this->logger->writeLog($i . " encomenda(s) inserida(s)." . PHP_EOL);
+                $this->logger->debug($i . " encomenda(s) inserida(s).");
             }
         }
+        
+        $this->logger->info("OK!!!!");
         
         $this->dbekt->trans_complete();
     }
@@ -963,21 +983,22 @@ class ImportarEkt2Espelhos extends CI_Controller
     {
         $this->dbekt->trans_start();
         
-        $this->logger->writeLog(PHP_EOL . PHP_EOL . "IMPORTANDO ITENS DE ENCOMENDAS..." . PHP_EOL . PHP_EOL);
+        $this->logger->info(PHP_EOL . PHP_EOL . "IMPORTANDO ITENS DE ENCOMENDAS...");
         
         $this->load->model('ekt/ektencomendaitem_model');
         $model = $this->ektencomendaitem_model;
         $model->setDb($this->dbekt);
         
         if (! $model->truncate_table()) {
-            log_message('error', 'Erro em truncate table');
+            $this->logger->info("Erro em truncate table importarEncomendasItens()");
             return;
         }
         
         $linhas = file($this->csvsPath . "ped_d071.csv");
         
         if (! $linhas or count($linhas) < 0) {
-            die("importarEncomendasItens() - Sem dados para importar");
+            $this->logger->debug("importarEncomendasItens() - Sem dados para importar");
+            return;
         }
         
         $i = 0;
@@ -1020,12 +1041,14 @@ class ImportarEkt2Espelhos extends CI_Controller
             $this->handleIudtUserInfo($ektEncomendaItem);
             
             if (! $this->dbekt->insert('ekt_encomenda_item', $ektEncomendaItem)) {
-                log_message('error', 'Erro ao salvar o ektEncomendaItem');
+                $this->logger->info('Erro ao salvar o ektEncomendaItem. PRODUTO = [' . $ektEncomendaItem['PRODUTO'] . "]");
                 return;
             } else {
-                $this->logger->writeLog($i . " item(ns) de encomenda inserido(s)." . PHP_EOL);
+                $this->logger->debug($i . " item(ns) de encomenda inserido(s).");
             }
         }
+        
+        $this->logger->info("OK!!!!");
         
         $this->dbekt->trans_complete();
     }
