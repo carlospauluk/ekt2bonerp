@@ -1,5 +1,7 @@
 <?php
 
+require_once ('./application/libraries/file/LogWriter.php');
+
 /**
  * Job que realiza a importação dos dados de vendas da base ekt para a base bonerp. bonerp
  *
@@ -16,6 +18,8 @@
  */
 class ImportarVendas extends CI_Controller
 {
+    
+    private $logger;
 
     private $agora;
 
@@ -100,62 +104,69 @@ class ImportarVendas extends CI_Controller
     {
         $time_start = microtime(true);
         
-        echo PHP_EOL . PHP_EOL;
+        $logPath = getenv('EKT_LOG_PATH') or die("EKT_LOG_PATH não informado" . PHP_EOL . PHP_EOL . PHP_EOL);
+        $prefix = "ImportarVendas" . '_' . $mesano . '_' . "_";
+        $this->logger = new LogWriter($logPath, $prefix);
         
-        echo "Iniciando a importação para o mês/ano: [" . $mesano . "]" . PHP_EOL;
+        $this->logger->writeLog( "Iniciando a importação para o mês/ano: [" . $mesano . "]" . PHP_EOL);
         $this->mesano = $mesano;
         $this->dtMesano = DateTime::createFromFormat('Ymd', $mesano . "01");
         if (! $this->dtMesano instanceof DateTime) {
             die("mesano inválido." . PHP_EOL . PHP_EOL . PHP_EOL);
         }
         $this->dtMesano->setTime(0, 0, 0, 0);
-        echo "OK!!!" . PHP_EOL . PHP_EOL;
+        $this->logger->writeLog( "OK!!!" . PHP_EOL . PHP_EOL);
         
         $this->importarVendas();
         
-        echo PHP_EOL . PHP_EOL . PHP_EOL;
-        echo "--------------------------------------------------------------" . PHP_EOL;
-        echo "--------------------------------------------------------------" . PHP_EOL;
-        echo "--------------------------------------------------------------" . PHP_EOL;
+        $this->marcarDeletadas();
         
-        echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> TOTAL VENDAS EKT: " . $this->totalVendasEkt . PHP_EOL;
-        echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>> TOTAL VENDAS EKT (SEM AUTORIZADAS): " . $this->totalVendasEkt_semautorizadas . PHP_EOL;
+        $this->logger->writeLog( PHP_EOL . PHP_EOL . PHP_EOL);
+        $this->logger->writeLog( "--------------------------------------------------------------" . PHP_EOL);
+        $this->logger->writeLog( "--------------------------------------------------------------" . PHP_EOL);
+        $this->logger->writeLog( "--------------------------------------------------------------" . PHP_EOL);
+        
+        $this->logger->writeLog( ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> TOTAL VENDAS EKT: " . $this->totalVendasEkt . PHP_EOL);
+        $this->logger->writeLog( ">>>>>>>>>>>>>>>>>>>>>>>>>>>> TOTAL VENDAS EKT (SEM AUTORIZADAS): " . $this->totalVendasEkt_semautorizadas . PHP_EOL);
         $valorConf = round($this->totalVendasEkt - $this->totalVendasEkt_semautorizadas, 2);
-        echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>> VALOR QUE DEVE ESTAR NO RELATÓRIO: " . $valorConf . PHP_EOL;
+        $this->logger->writeLog( ">>>>>>>>>>>>>>>>>>>>>>>>>>>>> VALOR QUE DEVE ESTAR NO RELATÓRIO: " . $valorConf . PHP_EOL);
         
         $regConf = $this->dbbonerp->query("SELECT valor FROM fin_reg_conf WHERE DATE_FORMAT(dt_registro, '%Y%m') = ? AND descricao = 'TOTAL VENDAS (IMPORTADO)'", array(
             $this->mesano
         ))->result_array();
         
         if (count($regConf) == 1) {
-            echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> 'TOTAL VENDAS (IMPORTADO)': " . $regConf[0]['valor'] . PHP_EOL;
-            echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> DIFERENÇA: " . round($valorConf - $regConf[0]['valor'], 2) . PHP_EOL . PHP_EOL;
+            $this->logger->writeLog( ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> 'TOTAL VENDAS (IMPORTADO)': " . $regConf[0]['valor'] . PHP_EOL);
+            $this->logger->writeLog( ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> DIFERENÇA: " . round($valorConf - $regConf[0]['valor'], 2) . PHP_EOL . PHP_EOL);
         } else {
-            echo " reg conf não encontrado " . PHP_EOL;
+            $this->logger->writeLog( " reg conf não encontrado " . PHP_EOL);
         }
         
-        echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> TOTAL VENDAS BONERP: " . $this->totalVendasBonerp . PHP_EOL;
-        echo ">>>>>>>>>>>>>>>>>>>>>>>>> TOTAL VENDAS BONERP (SEM AUTORIZADAS): " . $this->totalVendasBonerp_semautorizadas . PHP_EOL;
+        $this->logger->writeLog( ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> TOTAL VENDAS BONERP: " . $this->totalVendasBonerp . PHP_EOL);
+        $this->logger->writeLog( ">>>>>>>>>>>>>>>>>>>>>>>>> TOTAL VENDAS BONERP (SEM AUTORIZADAS): " . $this->totalVendasBonerp_semautorizadas . PHP_EOL);
         
-        echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> DIFERENÇA: " . ($this->totalVendasBonerp - $this->totalVendasEkt) . PHP_EOL;
+        $this->logger->writeLog( ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> DIFERENÇA: " . ($this->totalVendasBonerp - $this->totalVendasEkt) . PHP_EOL);
         
-        echo PHP_EOL . PHP_EOL . PHP_EOL;
-        echo "--------------------------------------------------------------" . PHP_EOL;
-        echo "--------------------------------------------------------------" . PHP_EOL;
-        echo "--------------------------------------------------------------" . PHP_EOL;
-        echo "INSERIDAS: " . $this->inseridas . PHP_EOL;
-        echo "ATUALIZADAS: " . $this->atualizadas . PHP_EOL;
+        $this->logger->writeLog( PHP_EOL . PHP_EOL . PHP_EOL);
+        $this->logger->writeLog( "--------------------------------------------------------------" . PHP_EOL);
+        $this->logger->writeLog( "--------------------------------------------------------------" . PHP_EOL);
+        $this->logger->writeLog( "--------------------------------------------------------------" . PHP_EOL);
+        $this->logger->writeLog( "INSERIDAS: " . $this->inseridas . PHP_EOL);
+        $this->logger->writeLog( "ATUALIZADAS: " . $this->atualizadas . PHP_EOL);
         
         $time_end = microtime(true);
         $execution_time = ($time_end - $time_start);
-        echo PHP_EOL . PHP_EOL . PHP_EOL;
-        echo "----------------------------------" . PHP_EOL;
-        echo "Total Execution Time: " . $execution_time . "s" . PHP_EOL . PHP_EOL . PHP_EOL;
+        $this->logger->writeLog( PHP_EOL . PHP_EOL . PHP_EOL);
+        $this->logger->writeLog( "----------------------------------" . PHP_EOL);
+        $this->logger->writeLog( "Total Execution Time: " . $execution_time . "s" . PHP_EOL . PHP_EOL . PHP_EOL);
+        
+        $this->logger->closeLog();
+        $this->logger->sendMail();
     }
 
-    public function importarVendas()
+    private function importarVendas()
     {
-        echo "Iniciando a importação de vendas..." . PHP_EOL;
+        $this->logger->writeLog( "Iniciando a importação de vendas..." . PHP_EOL);
         $this->dbbonerp->trans_start();
         
         
@@ -169,22 +180,22 @@ class ImportarVendas extends CI_Controller
         // $l = $this->dbekt->query("SELECT * FROM ekt_produto WHERE reduzido = 4521 AND mesano = ?", array($this->mesano))->result_array();
         
         $total = count($l);
-        echo " >>>>>>>>>>>>>>>>>>>> " . $total . " venda(s) encontrada(s)." . PHP_EOL;
+        $this->logger->writeLog( " >>>>>>>>>>>>>>>>>>>> " . $total . " venda(s) encontrada(s)." . PHP_EOL);
         
         $i = 0;
         foreach ($l as $ektVenda) {
-            echo " >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> " . ++ $i . "/" . $total . PHP_EOL;
+            $this->logger->writeLog( " >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> " . ++ $i . "/" . $total . PHP_EOL);
             $this->importarVenda($ektVenda);
         }
         
-        echo "Finalizando... commitando a transação..." . PHP_EOL;
+        $this->logger->writeLog( "Finalizando... commitando a transação..." . PHP_EOL);
         
         $this->dbbonerp->trans_complete();
         
-        echo "OK!!!" . PHP_EOL;
+        $this->logger->writeLog( "OK!!!" . PHP_EOL);
     }
     
-    public function importarVendedores() {
+    private function importarVendedores() {
         $ektVendedores = $this->dbekt->query("SELECT CODIGO, DESCRICAO FROM ekt_vendedor WHERE mesano = ?", array($this->mesano))->result_array();
         
         if (count($ektVendedores) < 1) {
@@ -213,7 +224,7 @@ class ImportarVendas extends CI_Controller
     }
     
 
-    public function importarVenda($ektVenda)
+    private function importarVenda($ektVenda)
     {
         $emissao_mesano = DateTime::createFromFormat('Y-m-d', $ektVenda['EMISSAO'])->format('Ym');
         if ($emissao_mesano != $this->mesano) {
@@ -225,13 +236,13 @@ class ImportarVendas extends CI_Controller
             $ektVenda['EMISSAO']
         );
         
-        echo PHP_EOL . ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Importando venda PV = [" . $ektVenda['NUMERO'] . "] em =[" . $ektVenda['EMISSAO'] . "]" . PHP_EOL;
+        $this->logger->writeLog( PHP_EOL . ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Importando venda PV = [" . $ektVenda['NUMERO'] . "] em =[" . $ektVenda['EMISSAO'] . "]" . PHP_EOL);
         
         $vendas = $this->dbbonerp->query("SELECT * FROM ven_venda WHERE pv = ? AND dt_venda = ?", $params)->result_array();
         $q = count($vendas);
         
         if ($q > 1) {
-            echo "Mais de uma venda encontrada para os dados" . PHP_EOL;
+            $this->logger->writeLog( "Mais de uma venda encontrada para os dados" . PHP_EOL);
             print_r($params);
             exit();
         }
@@ -257,14 +268,14 @@ class ImportarVendas extends CI_Controller
         $this->salvarVenda($ektVenda, $venda);
     }
 
-    public function deletarItens($venda)
+    private function deletarItens($venda)
     {
         $this->dbbonerp->query("DELETE FROM ven_venda_item WHERE venda_id = ?", array(
             $venda['id']
         )) or die("Erro ao deletar itens da venda_id = [" . $venda['id'] . "]" . PHP_EOL);
     }
 
-    public function salvarVenda($ektVenda, $venda = null)
+    private function salvarVenda($ektVenda, $venda = null)
     {
         $venda['deletado'] = false;
         
@@ -289,7 +300,7 @@ class ImportarVendas extends CI_Controller
         $venda_itens = array();
         foreach ($ektItens as $ektItem) {
             
-            echo "SALVANDO ITEM: " . $ektItem['PRODUTO'] . " - [" . $ektItem['DESCRICAO'] . "]" . PHP_EOL;
+            $this->logger->writeLog( "SALVANDO ITEM: " . $ektItem['PRODUTO'] . " - [" . $ektItem['DESCRICAO'] . "]" . PHP_EOL);
             
             $ektProduto = null;
             
@@ -305,7 +316,7 @@ class ImportarVendas extends CI_Controller
                 ))->result_array();
                 
                 if (! $ektProduto or count($ektProduto) == 0) {
-                    echo "ekt_produto não encontrado para REDUZIDO = [" . $ektItem['PRODUTO'] . "] e mesano = [" . $this->mesano . "]" . PHP_EOL;
+                    $this->logger->writeLog( "ekt_produto não encontrado para REDUZIDO = [" . $ektItem['PRODUTO'] . "] e mesano = [" . $this->mesano . "]" . PHP_EOL);
                     $ektItem['PRODUTO'] = 88888;
                 } else {
                     if (count($ektProduto) > 1) {
@@ -327,7 +338,7 @@ class ImportarVendas extends CI_Controller
             
             if (bccomp($valorTotal, $ektItem['VLR_TOTAL']) != 0) {
                 $msg = "********** ATENÇÃO: erro em total de produto importado. Total Produto EKT: " . $valorTotal . ". Total Calculado: " . $ektItem['VLR_TOTAL'];
-                echo $msg . PHP_EOL;
+                $this->logger->writeLog( $msg . PHP_EOL);
                 $itemVenda['obs'] .= PHP_EOL . $msg;
             }
             
@@ -375,7 +386,7 @@ class ImportarVendas extends CI_Controller
         
         if (bccomp($subTotalVenda, $ektVenda['SUB_TOTAL']) != 0) {
             $msg = "********** ATENÇÃO: erro em SUB TOTAL VENDA: " . $ektVenda['SUB_TOTAL'] . ". TOTAL SOMADO: " . $subTotalVenda;
-            echo $msg . PHP_EOL;
+            $this->logger->writeLog( $msg . PHP_EOL);
             $venda['obs'] .= PHP_EOL . $msg;
         }
         
@@ -387,7 +398,7 @@ class ImportarVendas extends CI_Controller
         
         if (bccomp($totalVendaCalculado, $totalVendaEKT) != 0) {
             $msg = "********** ATENÇÃO: erro em TOTAL VENDA EKT: [" . $totalVendaEKT . "] TOTAL SOMA: [" . $totalVendaCalculado . "]";
-            echo $msg . PHP_EOL;
+            $this->logger->writeLog( $msg . PHP_EOL);
             $venda['obs'] .= PHP_EOL . $msg;
         }
         
@@ -406,7 +417,7 @@ class ImportarVendas extends CI_Controller
         $this->totalVendasBonerp += $totalVendaCalculado;
         $this->totalVendasBonerp_semautorizadas += $ektVenda['COND_PAG'] == '6.00' ? $totalVendaCalculado : 0.0;
         
-        echo ">>>>>>>>>>>>>>>> VENDA SALVA" . PHP_EOL;
+        $this->logger->writeLog( ">>>>>>>>>>>>>>>> VENDA SALVA" . PHP_EOL);
     }
 
     /*
@@ -419,7 +430,6 @@ class ImportarVendas extends CI_Controller
     {
         $time_start = microtime(true);
         
-        echo "<pre>";
         $this->db->trans_start();
         
         $query = $this->db->query("SELECT * FROM ekt_venda WHERE cond_pag = '0.99'") or exit_db_error();
@@ -435,15 +445,15 @@ class ImportarVendas extends CI_Controller
                 )) or exit_db_error();
                 $naVenVenda = $query->result_array();
                 if (count($naVenVenda) == 0) {
-                    echo "Não encontrado para pv = '" . $r['NUMERO'] . "' e mesano = '" . $r['mesano'] . "'\n";
+                    $this->logger->writeLog( "Não encontrado para pv = '" . $r['NUMERO'] . "' e mesano = '" . $r['mesano'] . "'" . PHP_EOL);
                 } else if (count($naVenVenda) == 1) {
                     if ($naVenVenda[0]['plano_pagto_id'] == 2) {
                         $i ++;
-                        echo "Atualizando o pv = '" . $r['NUMERO'] . "' e mesano = '" . $r['mesano'] . "'\n";
+                        $this->logger->writeLog( "Atualizando o pv = '" . $r['NUMERO'] . "' e mesano = '" . $r['mesano'] . "'" . PHP_EOL);
                         $this->db->query("UPDATE ven_venda SET plano_pagto_id = 158 WHERE id = ?", $naVenVenda[0]['id']) or exit_db_error();
                     }
                 } else {
-                    echo "Mais de um encontrado para pv = '" . $r['NUMERO'] . "' e mesano = '" . $r['mesano'] . "'\n";
+                    $this->logger->writeLog( "Mais de um encontrado para pv = '" . $r['NUMERO'] . "' e mesano = '" . $r['mesano'] . "'" . PHP_EOL);
                     exit();
                 }
             } catch (Exception $e) {
@@ -452,7 +462,7 @@ class ImportarVendas extends CI_Controller
             }
         }
         
-        echo "\n\n\nTOTAL ATUALIZADO: " . $i . "\n";
+        $this->logger->writeLog( PHP_EOL . PHP_EOL . "TOTAL ATUALIZADO: " . $i . PHP_EOL);
         
         $this->db->trans_complete();
         
@@ -460,15 +470,15 @@ class ImportarVendas extends CI_Controller
         
         $execution_time = ($time_end - $time_start);
         
-        echo "\n\n\n\n----------------------------------\nTotal Execution Time: " . $execution_time . "s";
+        $this->logger->writeLog( PHP_EOL . "---------------------------------- Total Execution Time: " . $execution_time . "s" . PHP_EOL);
     }
 
     private function exit_db_error()
     {
-        echo str_pad("", 100, "*") . "\n";
-        echo "LAST QUERY: " . $this->db->last_query() . "\n\n";
+        $this->logger->writeLog( str_pad("", 100, "*") . PHP_EOL);
+        $this->logger->writeLog( "LAST QUERY: " . $this->db->last_query() . PHP_EOL . PHP_EOL);
         print_r($this->db->error());
-        echo str_pad("", 100, "*") . "\n";
+        $this->logger->writeLog( str_pad("", 100, "*") . PHP_EOL);
         exit();
     }
 
@@ -480,7 +490,7 @@ class ImportarVendas extends CI_Controller
 
     private $planosPagto;
 
-    public function findPlanoPagto($condPag)
+    private function findPlanoPagto($condPag)
     {
         if (! $this->planosPagto) {
             $r = $this->dbbonerp->query("SELECT id, codigo, descricao FROM ven_plano_pagto")->result_array();
@@ -492,7 +502,7 @@ class ImportarVendas extends CI_Controller
             }
         }
         if (! array_key_exists($condPag, $this->planosPagto)) {
-            echo "Plano de pagto não encontrado para: [" . $condPag . "]" . PHP_EOL . PHP_EOL;
+            $this->logger->writeLog( "Plano de pagto não encontrado para: [" . $condPag . "]" . PHP_EOL . PHP_EOL);
             return $this->planosPagto['9.99'];
         }
         return $this->planosPagto[$condPag];
@@ -502,7 +512,7 @@ class ImportarVendas extends CI_Controller
 
     private $vendedores_nomes;
 
-    public function findVendedor($codigo)
+    private function findVendedor($codigo)
     {
         if (! $this->vendedores_nomes) {
             $nomes = $this->dbekt->query("SELECT CODIGO, DESCRICAO FROM ekt_vendedor WHERE mesano = ?", array(
@@ -539,7 +549,7 @@ class ImportarVendas extends CI_Controller
 
     private $gradesTamanhos;
 
-    public function findGradeTamanhoByCodigoAndTamanho($codigo, $tamanho)
+    private function findGradeTamanhoByCodigoAndTamanho($codigo, $tamanho)
     {
         $tamanho = trim($tamanho);
         if (! $this->gradesTamanhos) {
@@ -559,13 +569,9 @@ class ImportarVendas extends CI_Controller
         }
     }
 
-    public function marcarDeletadas($mesano)
+    private function marcarDeletadas($mesano)
     {
-        $time_start = microtime(true);
-        
-        echo PHP_EOL . PHP_EOL;
-        
-        echo "Marcando vendas deletadas para o mês/ano: [" . $mesano . "]" . PHP_EOL;
+        $this->logger->writeLog( "Marcando vendas deletadas para o mês/ano: [" . $mesano . "]" . PHP_EOL);
         $this->mesano = $mesano;
         $this->dtMesano = DateTime::createFromFormat('Ymd', $mesano . "01");
         if (! $this->dtMesano instanceof DateTime) {
@@ -590,24 +596,19 @@ class ImportarVendas extends CI_Controller
         $deletadas = 0;
         foreach ($vendas as $venda) {
             if (! array_search($venda['pv'], $ektVendaz)) {
-                echo $venda['pv'] . " não existe. Marcando como deletada..." . PHP_EOL;
+                $this->logger->writeLog( $venda['pv'] . " não existe. Marcando como deletada..." . PHP_EOL);
                 $venda['deletado'] = true;
                 $this->venda_model->save($venda);
                 $deletadas ++;
-                echo "OK!!!" . PHP_EOL . PHP_EOL;
+                $this->logger->writeLog( "OK!!!" . PHP_EOL . PHP_EOL);
             }
         }
         
-        echo PHP_EOL . PHP_EOL . PHP_EOL;
-        echo "--------------------------------------------------------------" . PHP_EOL;
-        echo "--------------------------------------------------------------" . PHP_EOL;
-        echo "--------------------------------------------------------------" . PHP_EOL;
-        echo "DELETADAS: " . $deletadas . PHP_EOL;
+        $this->logger->writeLog( PHP_EOL . PHP_EOL . PHP_EOL);
+        $this->logger->writeLog( "--------------------------------------------------------------" . PHP_EOL);
+        $this->logger->writeLog( "--------------------------------------------------------------" . PHP_EOL);
+        $this->logger->writeLog( "--------------------------------------------------------------" . PHP_EOL);
+        $this->logger->writeLog( "DELETADAS: " . $deletadas . PHP_EOL);
         
-        $time_end = microtime(true);
-        $execution_time = ($time_end - $time_start);
-        echo PHP_EOL . PHP_EOL . PHP_EOL;
-        echo "----------------------------------" . PHP_EOL;
-        echo "Total Execution Time: " . $execution_time . "s" . PHP_EOL . PHP_EOL . PHP_EOL;
     }
 }

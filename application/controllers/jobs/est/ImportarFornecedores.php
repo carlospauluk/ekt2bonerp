@@ -1,11 +1,18 @@
 <?php
 
+require_once('./application/libraries/file/LogWriter.php');
+
 /**
  * Job que realiza a importação dos fornecedores a partir da tabela ekt_fornecedor.
+ * 
+ * 
+ * 
  */
 class ImportarFornecedores extends CI_Controller
 {
 
+    private $logger;
+    
     private $inseridos = 0;
 
     private $atualizados = 0;
@@ -53,18 +60,25 @@ class ImportarFornecedores extends CI_Controller
             die("mesano inválido.\n\n\n");
         }
         
+        $logPath = getenv('EKT_LOG_PATH') or die("EKT_LOG_PATH não informado\n\n\n");
+        
+        $prefix = "ImportarFornecedores" . '_' . $mesano . '_';
+        
+        $this->logger = new LogWriter($logPath, $prefix);
+        
+        
+        
         $sql = "SELECT * FROM ekt_fornecedor WHERE mesano = ? ORDER BY id";
         $query = $this->dbekt->query($sql, $mesano) or $this->exit_db_error();
         $result = $query->result_array();
         
-        echo "<pre>";
         // Para cada um dos ekt_fornecedor...
         foreach ($result as $fornecedorEkt) {
             
             $codigoEkt = $fornecedorEkt['CODIGO'];
             $nomeFantasia = trim($fornecedorEkt['NOME_FANTASIA']);
             
-            echo PHP_EOL . "EKT >>>>> Código: [" . $codigoEkt . "] Nome Fantasia: [" . $nomeFantasia . "]" . PHP_EOL;
+            $this->logger->writeLog(PHP_EOL . "EKT >>>>> Código: [" . $codigoEkt . "] Nome Fantasia: [" . $nomeFantasia . "]" . PHP_EOL);
             
             // Pesquisa nos est_fornecedor pelo mesmo codigo_ekt, somente tipo 'ESTOQUE', e ainda vigentes (ate is NULL)
             $params = array(
@@ -80,34 +94,37 @@ class ImportarFornecedores extends CI_Controller
                 // Não encontrou
                 if (count($r) == 0) {
                     // Simplesmente salva
-                    echo "Não existente. Salvando..." . PHP_EOL;
+                    $this->logger->writeLog("Não existente. Salvando..." . PHP_EOL);
                     $this->salvarFornecedor($fornecedorEkt);
                     $this->inseridos ++;
                 } else {
                     $fornecedorBonERP = $r[0];
-                    echo "Já existente. Atualizando..." . PHP_EOL;
+                    $this->logger->writeLog("Já existente. Atualizando..." . PHP_EOL);
                     $this->salvarFornecedor($fornecedorEkt, $fornecedorBonERP);
                     $this->atualizados ++;
                 }
-                echo "OK!!!" . PHP_EOL;
+                $this->logger->writeLog("OK!!!" . PHP_EOL);
             }
         }
         
         $this->dbbonerp->trans_complete();
         
-        echo PHP_EOL . PHP_EOL . PHP_EOL;
-        echo "--------------------------------------------------------------" . PHP_EOL;
-        echo "--------------------------------------------------------------" . PHP_EOL;
-        echo "--------------------------------------------------------------" . PHP_EOL;
-        echo "INSERIDOS: " . $this->inseridos . PHP_EOL;
-        echo "ATUALIZADOS: " . $this->atualizados . PHP_EOL;
-        echo "ACERTADOS DEPARA: " . $this->acertados_depara . PHP_EOL;
+        $this->logger->writeLog(PHP_EOL . PHP_EOL . PHP_EOL);
+        $this->logger->writeLog("--------------------------------------------------------------" . PHP_EOL);
+        $this->logger->writeLog("--------------------------------------------------------------" . PHP_EOL);
+        $this->logger->writeLog("--------------------------------------------------------------" . PHP_EOL);
+        $this->logger->writeLog("INSERIDOS: " . $this->inseridos . PHP_EOL);
+        $this->logger->writeLog("ATUALIZADOS: " . $this->atualizados . PHP_EOL);
+        $this->logger->writeLog("ACERTADOS DEPARA: " . $this->acertados_depara . PHP_EOL);
         
         $time_end = microtime(true);
         $execution_time = ($time_end - $time_start);
-        echo PHP_EOL . PHP_EOL . PHP_EOL;
-        echo "----------------------------------" . PHP_EOL;
-        echo "Total Execution Time: " . $execution_time . "s" . PHP_EOL . PHP_EOL . PHP_EOL;
+        $this->logger->writeLog(PHP_EOL . PHP_EOL . PHP_EOL);
+        $this->logger->writeLog("Total Execution Time: " . $execution_time . "s" . PHP_EOL . PHP_EOL . PHP_EOL);
+        $this->logger->writeLog("----------------------------------" . PHP_EOL);
+        
+        $this->logger->closeLog();
+        $this->logger->sendMail();
     }
 
     /**
@@ -129,13 +146,13 @@ class ImportarFornecedores extends CI_Controller
         if ($fornecedorBonERP_id) {
             $atualizando = true;
             // $fornecedorBonERP['codigo'] = $fornecedorEkt['CODIGO'];
-            echo "ATUALIZANDO fornecedor... ";
+            $this->logger->writeLog("ATUALIZANDO fornecedor... ");
         } else {
-            echo "INSERINDO novo fornecedor... ";
+            $this->logger->writeLog("INSERINDO novo fornecedor... ");
             $fornecedorBonERP['codigo'] = $this->findNovoCodigo($fornecedorEkt['CODIGO']);
             $fornecedorBonERP['codigo_ekt_desde'] = $this->dtMesano->format('Y-m-d');
         }
-        echo $fornecedorEkt['CODIGO'] . " - " . $fornecedorEkt['NOME_FANTASIA'] . "\n";
+        $this->logger->writeLog($fornecedorEkt['CODIGO'] . " - " . $fornecedorEkt['NOME_FANTASIA'] . PHP_EOL);
         
         $fornecedorBonERP['codigo_ekt'] = $fornecedorEkt['CODIGO'];
         $fornecedorBonERP['inscricao_estadual'] = $fornecedorEkt['INSC'];
@@ -170,12 +187,12 @@ class ImportarFornecedores extends CI_Controller
         $pessoa['tipo_pessoa'] = 'PESSOA_JURIDICA';
         
         if ($atualizando) {
-            echo "Atualizando bon_pessoa... " . $pessoaId . "\n";
+            $this->logger->writeLog("Atualizando bon_pessoa... " . $pessoaId . PHP_EOL);
             $this->dbbonerp->update('bon_pessoa', $pessoa, array(
                 'id' => $pessoaId
             )) or $this->exit_db_error();
         } else {
-            echo "Inserindo bon_pessoa... \n";
+            $this->logger->writeLog("Inserindo bon_pessoa..." . PHP_EOL);
             $pessoa['inserted'] = date("Y-m-d H:i:s");
             $pessoa['estabelecimento_id'] = 1;
             $pessoa['user_inserted_id'] = 1;
@@ -189,7 +206,7 @@ class ImportarFornecedores extends CI_Controller
         $fornecedorBonERP['fornecedor_tipo_id'] = 2;
         
         if ($atualizando) {
-            echo "UPDATE est_fornecedor...\n";
+            $this->logger->writeLog("UPDATE est_fornecedor..." . PHP_EOL);
             $this->dbbonerp->update('est_fornecedor', $fornecedorBonERP, array(
                 'id' => $fornecedorBonERP_id
             )) or $this->exit_db_error();
@@ -199,13 +216,10 @@ class ImportarFornecedores extends CI_Controller
             $fornecedorBonERP['estabelecimento_id'] = 1;
             $fornecedorBonERP['user_inserted_id'] = 1;
             $fornecedorBonERP['user_updated_id'] = 1;
-            if ($fornecedorEkt['id'] == 29) {
-                echo "";
-            }
-            echo "INSERT na est_fornecedor... ";
+            $this->logger->writeLog("INSERT na est_fornecedor... ");
             $this->dbbonerp->insert('est_fornecedor', $fornecedorBonERP) or $this->exit_db_error();
             $fornecedorBonERP_id = $this->dbbonerp->insert_id();
-            echo $fornecedorBonERP_id . "\n";
+            $this->logger->writeLog($fornecedorBonERP_id . PHP_EOL);
         }
         // Agora já pode setar novamente
         $fornecedorBonERP['id'] = $fornecedorBonERP_id;
@@ -296,7 +310,7 @@ class ImportarFornecedores extends CI_Controller
     {
         $corrigiu_algo_aqui = false;
         $fornecedorId = $fornecedorBonERP['id'];
-        echo "LIDANDO COM 'depara' [$fornecedorId]... \n";
+        $this->logger->writeLog("LIDANDO COM 'depara' [$fornecedorId]..." . PHP_EOL);
         
         $sql = "SELECT * FROM est_fornecedor_codektmesano WHERE fornecedor_id = ? AND mesano = ? AND codigo_ekt = ?";
         $params = array(
@@ -349,7 +363,7 @@ class ImportarFornecedores extends CI_Controller
         }
     }
 
-    public function findNovoCodigo($codigoEkt)
+    private function findNovoCodigo($codigoEkt)
     {
         $query = $this->dbbonerp->get_where('est_fornecedor', array(
             'codigo' => $codigoEkt
@@ -404,22 +418,26 @@ class ImportarFornecedores extends CI_Controller
         $time_start = microtime(true);
         $this->dbbonerp->trans_start();
         
+        $logPath = getenv('EKT_LOG_PATH') or die("EKT_LOG_PATH não informado\n\n\n");
+        $prefix = "ImportarFornecedores.setar_codigos_ekt._";
+        $this->logger = new LogWriter($logPath, $prefix);
+        
+        
+        
         $sql = "SELECT * FROM ekt_fornecedor WHERE nome_fantasia IS NOT NULL AND trim(nome_fantasia) != '' ORDER BY id";
         $query = $this->dbekt->query($sql) or $this->exit_db_error();
         $result = $query->result_array();
-        
-        echo "<pre>";
         
         $i = 0;
         foreach ($result as $fornecedorEkt) {
             
             $nome = $fornecedorEkt['NOME_FANTASIA'];
             $nome = preg_replace("( )", "", $nome);
-            echo "\n\n" . str_pad("", 150, "-") . " " . ++ $i . "\n";
-            echo "INICIANDO... " . $nome . "\n";
+            $this->logger->writeLog(PHP_EOL . PHP_EOL . str_pad("", 150, "-") . " " . ++ $i . PHP_EOL);
+            $this->logger->writeLog("INICIANDO... " . $nome . PHP_EOL);
             
             if (! $nome) {
-                echo "Sem nome (código: " . $fornecedorEkt['CODIGO'] . ")\n\n";
+                $this->logger->writeLog("Sem nome (código: " . $fornecedorEkt['CODIGO'] . ")" . PHP_EOL . PHP_EOL);
                 continue;
             }
             
@@ -429,40 +447,43 @@ class ImportarFornecedores extends CI_Controller
             $r = $query->result_array();
             
             if (count($r) > 1) {
-                echo "\n\n" . str_pad("", 150, "%") . "\n";
-                echo "Mais de um encontrado: " . $nome;
-                echo "\n\n" . str_pad("", 150, "%") . "\n";
+                $this->logger->writeLog(PHP_EOL . str_pad("", 150, "%") . PHP_EOL);
+                $this->logger->writeLog("Mais de um encontrado: " . $nome);
+                $this->logger->writeLog(PHP_EOL . PHP_EOL . str_pad("", 150, "%") . PHP_EOL);
                 continue;
             } else {
                 if (count($r) == 1) {
-                    echo "Somente um encontrado.\n";
+                    $this->logger->writeLog("Somente um encontrado." . PHP_EOL);
                     $fornecedorBonERP = $r[0];
-                    echo "OK\nSalvando na depara...";
+                    $this->logger->writeLog("OK!" . PHP_EOL);
+                    $this->logger->writeLog("Salvando na depara...");
                     $this->salvarNaDePara($fornecedorBonERP, $fornecedorEkt);
-                    echo "OK.";
+                    $this->logger->writeLog("OK.");
                 } else {
-                    echo "NENHUM ENCONTRADO... salvando...\n\n";
+                    $this->logger->writeLog("NENHUM ENCONTRADO... salvando..." . PHP_EOL . PHP_EOL);
                     $this->salvarFornecedor($fornecedorEkt);
                 }
             }
         }
         
-        echo "FINALIZANDO.\n\n";
+        $this->logger->writeLog("FINALIZANDO." . PHP_EOL . PHP_EOL);
         
         $this->dbbonerp->trans_complete();
         
         $time_end = microtime(true);
         $execution_time = ($time_end - $time_start);
-        echo "\n\n\n\n----------------------------------\nTotal Execution Time: " . $execution_time . "s";
+        $this->logger->writeLog(PHP_EOL . PHP_EOL . "----------------------------------\nTotal Execution Time: " . $execution_time . "s");
+        $this->logger->closeLog();
+        $this->logger->sendMail();
     }
 
     private function exit_db_error($msg = null)
     {
-        echo str_pad("", 100, "*") . "\n";
-        echo $msg ? $msg . PHP_EOL : '';
-        echo "LAST QUERY: " . $this->dbbonerp->last_query() . PHP_EOL . PHP_EOL;
+        $this->logger->writeLog(str_pad("", 100, "*") . PHP_EOL);
+        $this->logger->writeLog($msg ? $msg . PHP_EOL : '');
+        $this->logger->writeLog("LAST QUERY: " . $this->dbbonerp->last_query() . PHP_EOL . PHP_EOL);
         print_r($this->dbbonerp->error()) . PHP_EOL . PHP_EOL;
-        echo str_pad("", 100, "*") . PHP_EOL;
+        $this->logger->writeLog(str_pad("", 100, "*") . PHP_EOL);
         exit();
     }
 }
