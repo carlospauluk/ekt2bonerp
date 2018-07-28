@@ -188,6 +188,10 @@ class ImportarProdutos extends CI_Controller
             if ($ektProduto['REDUZIDO'] == 88888) {
                 continue;
             }
+            if (trim($ektProduto['DESCRICAO']) == '') {
+                $this->logger->info(" >>>>>>>>>>>>>>>>>>>> PRODUTO com reduzido = '" . $ektProduto['REDUZIDO'] . " está sem descrição. PULANDO.");
+                continue;
+            }
             $this->logger->debug(" >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> " . ++ $i . "/" . $total);
             $this->importarProduto($ektProduto);
         }
@@ -221,6 +225,8 @@ class ImportarProdutos extends CI_Controller
                 
                 $descricao_ekt = trim($ektProduto['DESCRICAO']);
                 $descricao = trim($mesmoReduzido['descricao']);
+                
+                
                 // similar_text($descricao_ekt, $descricao, $percent);
                 // $percent = $this->similarity($descricao_ekt,$descricao);
                 
