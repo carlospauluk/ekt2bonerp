@@ -823,6 +823,7 @@ class ImportarProdutos extends CI_Controller
                     if ($qtde != 1) {
                         throw new Exception("Erro. Qtde deveria ser exatamente 1 para reduzido = '" . $r['REDUZIDO'] . "' e descricao = '" . $r['DESCRICAO'] . "'. QTDE='" . $qtde . "'");
                     }
+                    $produto = $result[0];
                     $this->salvarProdutoPreco($r, $produto['id'], $mesano);
                     $this->logger->info($i ++ . " (" . $r['id'] . ")");
                 } catch (Exception $e) {
