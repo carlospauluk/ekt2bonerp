@@ -16,7 +16,7 @@ require_once ('./application/libraries/util/Datetime_utils.php');
  *
  * LINUX:
  * export EKT_CSVS_PATH=/mnt/10.1.1.100-export/
- * export EKT_LOG_PATH=~/dev/github/ekt2bonerp/log/
+ * export EKT_LOG_PATH=/home/dev/github/ekt2bonerp/log/
  * export XDEBUG_CONFIG="idekey=session_name"
  *
  * IMPORTAR PRODUTOS:
@@ -145,7 +145,7 @@ class ImportarProdutos extends CI_Controller
             
             $this->importarProdutos();
             $this->gerarProdutoSaldoHistorico();
-//             $this->corrigirEktDesdeAte();
+            // $this->corrigirEktDesdeAte();
         }
         if ($acao == 'DEATE') {
             $this->corrigirEktDesdeAte();
@@ -524,8 +524,9 @@ class ImportarProdutos extends CI_Controller
     }
 
     /**
-     * 
-     * @param $produtoBonERP
+     *
+     * @param
+     *            $produtoBonERP
      */
     private function acertaPeriodosReduzidoEKT($produtoBonERP)
     {
@@ -792,6 +793,8 @@ class ImportarProdutos extends CI_Controller
     {
         $this->dbbonerp->trans_start();
         
+        $this->dbbonerp->query("TRUNCATE TABLE est_produto_preco");
+        
         $mesano_ini = "201401";
         $hoje = new DateTime();
         $mesano_fim = $hoje->format("Ym");
@@ -799,6 +802,7 @@ class ImportarProdutos extends CI_Controller
         $mesesanos = Datetime_utils::mesano_list($mesano_ini, $mesano_fim);
         
         foreach ($mesesanos as $mesano) {
+            $this->mesano = $mesano;
             
             $query = $this->dbekt->get_where("ekt_produto", array(
                 'mesano' => $mesano
@@ -810,11 +814,14 @@ class ImportarProdutos extends CI_Controller
             foreach ($result as $r) {
                 try {
                     // Para cada ekt_produto, encontra o est_produto
-                    $query = $this->dbbonerp->query("SELECT id FROM est_produto WHERE trim(descricao) LIKE ? ", array(trim($r['DESCRICAO'])));
+                    $query = $this->dbbonerp->query("SELECT * FROM est_produto WHERE reduzido_ekt = ? AND trim(descricao) LIKE ? ", array(
+                        $r['REDUZIDO'],
+                        trim($r['DESCRICAO'])
+                    ));
                     $result = $query->result_array();
-                    
-                    if (count($result)!=1) {
-                        throw new Exception("Erro. Qtde deveria ser exatamente 1");
+                    $qtde = count($result);
+                    if ($qtde != 1) {
+                        throw new Exception("Erro. Qtde deveria ser exatamente 1 para reduzido = '" . $r['REDUZIDO'] . "' e descricao = '" . $r['DESCRICAO'] . "'. QTDE='" . $qtde . "'");
                     }
                     $this->salvarProdutoPreco($r, $produto['id'], $mesano);
                     $this->logger->info($i ++ . " (" . $r['id'] . ")");
@@ -1094,12 +1101,10 @@ class ImportarProdutos extends CI_Controller
     }
 
     /**
-     * 
      */
     private function corrigirEktDesdeAte()
     {
         $this->dbbonerp->trans_start();
-
         
         $this->dbbonerp->query("TRUNCATE TABLE est_produto_reduzidoektmesano");
         $this->dbbonerp->query("UPDATE est_produto SET reduzido_ekt_desde = NULL, reduzido_ekt_ate = NULL");
@@ -1109,7 +1114,7 @@ class ImportarProdutos extends CI_Controller
         $mesano_fim = $hoje->format("Ym");
         $mesesanos = Datetime_utils::mesano_list($mesano_ini, $mesano_fim);
         
-        // Depois que comecei a tratar descrições diferentes como produtos diferentes, esta query deve sempre NÃO retornar nada.        
+        // Depois que comecei a tratar descrições diferentes como produtos diferentes, esta query deve sempre NÃO retornar nada.
         // select reduzido_ekt, descricao, count(*) as qtde from est_produto group by reduzido_ekt, descricao having qtde > 1;
         
         foreach ($mesesanos as $mesano) {
@@ -1125,11 +1130,14 @@ class ImportarProdutos extends CI_Controller
             foreach ($result as $r) {
                 try {
                     // Para cada ekt_produto, encontra o est_produto
-                    $query = $this->dbbonerp->query("SELECT * FROM est_produto WHERE reduzido_ekt = ? AND trim(descricao) LIKE ? ", array($r['REDUZIDO'], trim($r['DESCRICAO'])));
+                    $query = $this->dbbonerp->query("SELECT * FROM est_produto WHERE reduzido_ekt = ? AND trim(descricao) LIKE ? ", array(
+                        $r['REDUZIDO'],
+                        trim($r['DESCRICAO'])
+                    ));
                     $result = $query->result_array();
-                    
-                    if (count($result)!=1) {
-                        throw new Exception("Erro. Qtde deveria ser exatamente 1 para reduzido = '" . $r['REDUZIDO'] . "' e descricao = '" . $r['DESCRICAO'] . "'");
+                    $qtde = count($result);
+                    if ($qtde != 1) {
+                        throw new Exception("Erro. Qtde deveria ser exatamente 1 para reduzido = '" . $r['REDUZIDO'] . "' e descricao = '" . $r['DESCRICAO'] . "'. QTDE='" . $qtde . "'");
                     }
                     $this->acertaPeriodosReduzidoEKT($result[0]);
                     $this->logger->info($i ++ . " (" . $r['id'] . ")");
@@ -1139,7 +1147,6 @@ class ImportarProdutos extends CI_Controller
                 }
             }
         }
-        
         
         // Pego TODOS os produtos da est_produto
         $prods = $this->dbbonerp->query("SELECT id, reduzido_ekt_desde, reduzido_ekt_ate FROM est_produto WHERE reduzido_ekt is not null AND reduzido_ekt != '88888'")->result_array();
