@@ -78,6 +78,11 @@ class ImportarFornecedores extends CI_Controller
             $codigoEkt = $fornecedorEkt['CODIGO'];
             $nomeFantasia = trim($fornecedorEkt['NOME_FANTASIA']);
             
+            if ($nomeFantasia == '') {
+                $this->logger->info(" >>>>>>>>>>>>>>>>>>>> FORNECEDOR com código = '" . $codigoEkt . " está sem nome fantasia. PULANDO.");
+                continue;
+            }
+            
             $this->logger->info("EKT >>>>> Código: [" . $codigoEkt . "] Nome Fantasia: [" . $nomeFantasia . "]");
             
             // Pesquisa nos est_fornecedor pelo mesmo codigo_ekt, somente tipo 'ESTOQUE', e ainda vigentes (ate is NULL)
