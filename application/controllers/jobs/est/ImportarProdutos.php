@@ -226,7 +226,6 @@ class ImportarProdutos extends CI_Controller
                 $descricao_ekt = trim($ektProduto['DESCRICAO']);
                 $descricao = trim($mesmoReduzido['descricao']);
                 
-                
                 // similar_text($descricao_ekt, $descricao, $percent);
                 // $percent = $this->similarity($descricao_ekt,$descricao);
                 
@@ -377,9 +376,11 @@ class ImportarProdutos extends CI_Controller
             $params[] = $ektProduto['PCUSTO'];
             $params[] = $ektProduto['PPRAZO'];
             
-            // @formatter:off
-            $sql = "SELECT 1 FROM est_produto_preco WHERE " . "produto_id = ? AND " . "dt_custo = ? AND " . "preco_custo = ? AND " . "preco_prazo = ? AND " . "1=1";
-            // @formatter:on
+            $sql = "SELECT 1 FROM est_produto_preco WHERE 
+                        produto_id = ? AND 
+                        dt_custo = ? AND 
+                        preco_custo = ? AND 
+                        preco_prazo = ?";
             
             $mesmo = $this->dbbonerp->query($sql, $params)->result_array();
             
