@@ -1,5 +1,11 @@
 <?php
 
+/**
+ * Gerador de código fonte para entidades do Doctrine a partir das tabelas da bonerp.
+ * 
+ * @author Carlos Eduardo Pauluk
+ *
+ */
 class Doctrine extends CI_Controller
 {
 
