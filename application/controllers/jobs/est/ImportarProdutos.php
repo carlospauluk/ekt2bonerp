@@ -556,10 +556,10 @@ class ImportarProdutos extends CI_Controller
         // verifica se o mesano é maior que o reduzido_ekt_ate
         // se for, seta o reduzido_ekt_ate pro mesano
         if (array_key_exists('reduzido_ekt_ate', $produtoBonERP) and $produtoBonERP['reduzido_ekt_ate']) {
-            $dt_ekt_ate = DateTime::createFromFormat('Y-m-d', $produtoBonERP['reduzido_ekt_ate']);
+            $dt_ekt_ate = DateTime::createFromFormat('Y-m-t', $produtoBonERP['reduzido_ekt_ate']);
             $dt_ekt_ate->setTime(0, 0, 0, 0);
             if ($this->dtMesano > $dt_ekt_ate) {
-                $produtoBonERP['reduzido_ekt_ate'] = $this->dtMesano->format('Y-m-d');
+                $produtoBonERP['reduzido_ekt_ate'] = $this->dtMesano->format('Y-m-t');
                 $this->dbbonerp->update('est_produto', $produtoBonERP, array(
                     'id' => $produtoId
                 )) or $this->exit_db_error("Erro ao atualizar 'reduzido_ekt_ate'");
