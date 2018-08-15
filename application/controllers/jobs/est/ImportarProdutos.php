@@ -49,10 +49,10 @@ class ImportarProdutos extends CI_Controller
      *
      * @var string
      */
-    private $mesAno;
+    private $mesano;
 
     /**
-     * Parseado do $mesAno para um DateTime.
+     * Parseado do $mesano para um DateTime.
      *
      * @var DateTime
      */
@@ -386,34 +386,15 @@ class ImportarProdutos extends CI_Controller
             
             if (! $mesmo) {
                 $this->logger->debug("Não tem... salvando o preço...");
-                $this->savePreco($ektProduto, $produto_id);
+                $this->salvarProdutoPreco($ektProduto, $produto_id, $this->mesano);
             }
         } else {
             $this->logger->debug("Inserindo o preço...");
-            $this->savePreco($ektProduto, $produto_id);
+            $this->salvarProdutoPreco($ektProduto, $produto_id, $this->mesano);
         }
         $this->logger->debug("OK!!!");
         
         return $produto;
-    }
-
-    private function savePreco($ektProduto, $produto_id)
-    {
-        $preco['mesano'] = $this->mesano;
-        $preco['produto_id'] = $produto_id;
-        $preco['coeficiente'] = $ektProduto['COEF'];
-        $preco['custo_operacional'] = $ektProduto['MARGEMC'];
-        $preco['custo_financeiro'] = 0.15;
-        $preco['margem'] = $ektProduto['MARGEM'];
-        $preco['dt_custo'] = $ektProduto['DATA_PCUSTO'];
-        $preco['dt_preco_venda'] = $ektProduto['DATA_PVENDA'];
-        $preco['prazo'] = $ektProduto['PRAZO'];
-        $preco['preco_custo'] = $ektProduto['PCUSTO'];
-        $preco['preco_prazo'] = $ektProduto['PPRAZO'];
-        $preco['preco_promo'] = $ektProduto['PPROMO'];
-        $preco['preco_vista'] = $ektProduto['PVISTA'];
-        
-        $this->preco_model->save($preco) or $this->exit_db_error("Erro ao salvar o preço para o produto id [" . $produto_id . "]");
     }
 
     /**
@@ -583,7 +564,7 @@ class ImportarProdutos extends CI_Controller
             $dt_ekt_ate = DateTime::createFromFormat('Y-m-d', $produtoBonERP['reduzido_ekt_ate']);
             $dt_ekt_ate->setTime(0, 0, 0, 0);
             if ($this->dtMesano > $dt_ekt_ate) {
-                $produtoBonERP['reduzido_ekt_ate'] = $this->dtMesano->format('Y-m-d');
+                $produtoBonERP['reduzido_ekt_ate'] = $this->dtMesano->format('Y-m-t');
                 $this->dbbonerp->update('est_produto', $produtoBonERP, array(
                     'id' => $produtoId
                 )) or $this->exit_db_error("Erro ao atualizar 'reduzido_ekt_ate'");
