@@ -318,6 +318,10 @@ class ImportarVendas extends CI_Controller
         $venda['plano_pagto_id'] = $this->findPlanoPagto($ektVenda['COND_PAG']);
         
         $venda['vendedor_id'] = $this->findVendedor($ektVenda['VENDEDOR']);
+        if (!$venda['vendedor_id']) {
+            $this->logger->info('Vendedor não encontrado, portanto pulando venda... ' . $ektVenda['NUMERO'] . ' de ' . $this->mesAno);
+            return;
+        }
         
         $params = array(
             $this->mesano,
