@@ -49,10 +49,10 @@ class ImportarProdutos extends CI_Controller
      *
      * @var string
      */
-    private $mesAno;
+    private $mesano;
 
     /**
-     * Parseado do $mesAno para um DateTime.
+     * Parseado do $mesano para um DateTime.
      *
      * @var DateTime
      */
