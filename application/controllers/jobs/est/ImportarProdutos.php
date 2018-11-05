@@ -9,7 +9,8 @@ require_once ('./application/libraries/util/Datetime_utils.php');
  *
  * Pela linha de comando, chamar com:
  *
- * WINDOWS:
+ * (debug? export/set XDEBUG_CONFIG="idekey=session_name")
+ *
  * set EKT_CSVS_PATH=\\10.1.1.100\export
  * set EKT_LOG_PATH=C:\ekt2bonerp\log\
  * set XDEBUG_CONFIG="idekey=session_name"
@@ -50,6 +51,12 @@ class ImportarProdutos extends CI_Controller
      * @var string
      */
     private $mesano;
+
+    /**
+     * Se o $mesano = now
+     * @var
+     */
+    private $atual;
 
     /**
      * Parseado do $mesano para um DateTime.
@@ -135,7 +142,10 @@ class ImportarProdutos extends CI_Controller
             $this->logger->closeLog();
             exit();
         }
-        
+
+        $this->atual = $this->mesano == $this->agora->format('Ym');
+        $this->logger->info("Importando 'atual'? " . ($this->atual ? 'SIM' : 'NÃO'));
+
         if ($acao == 'PROD') {
             $this->logger->info("Iniciando a importação para o mês/ano: [" . $mesano . "]");
             $this->dtMesano->setTime(0, 0, 0, 0);
@@ -359,6 +369,8 @@ class ImportarProdutos extends CI_Controller
         $produto['tipo_tributacao'] = "T";
         $produto['ncm'] = $ektProduto['NCM'] ? $ektProduto['NCM'] : "62179000";
         $produto['fracionado'] = $ektProduto['FRACIONADO'] == 'S' ? true : false;
+
+        $produto['atual'] = $this->atual;
         
         $this->logger->debug(" ________________________ save PRODUTO ");
         $produto_id = $this->produto_model->save($produto);

@@ -37,6 +37,9 @@ composer.phar
 
 config/production/*
 
+config/database.php
+
+/log
 
 
 /index.php
