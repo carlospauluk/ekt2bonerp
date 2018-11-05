@@ -27,7 +27,7 @@ class ErrorFixer extends CI_Controller
      */
     public function datasZeradas()
     {
-        $r = $this->dbbonerp->query("SELECT distinct table_name, column_name, column_type FROM information_schema.columns WHERE table_schema = 'bonerp' AND table_name NOT LIKE 'vw%' and column_type LIKE 'date%'")->result_array();
+        $r = $this->dbbonerp->query("SELECT distinct table_name, column_name, column_type FROM information_schema.columns WHERE table_schema = 'bonerp' AND table_name NOT LIKE 'vw%' and column_type LIKE '%date%'")->result_array();
         
         foreach ($r as $l) {
             $dtR = $this->dbbonerp->query("SELECT 1 FROM " . $l['table_name'] . " WHERE DATE_FORMAT(" . $l['column_name'] . ",'%Y-%m-%d') = '0000-00-00'")->result_array();
