@@ -649,6 +649,9 @@ class ImportarProdutos extends CI_Controller
 
     private function deletarSaldos()
     {
+	$sql = "DELETE FROM est_produto_reduzidoektmesano WHERE mesano = ?";
+	$this->dbbonerp->query($sql, [$this->mesano]);
+
         $sql = 'TRUNCATE TABLE est_produto_saldo';
         $this->dbbonerp->query($sql) or $this->exit_db_error("Erro ao $sql");
     }
