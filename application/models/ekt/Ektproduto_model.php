@@ -17,6 +17,16 @@ class Ektproduto_model extends CIBases\Models\DAO\Base\Base_model
         return $query->result_array();
     }
 
+    public function findByMesanoAndReduzido($mesano, $reduzido)
+    {
+        $sql = "SELECT * FROM ekt_produto WHERE mesano = ? AND reduzido = ?";
+        $query = $this->db->query($sql, array(
+            $mesano,
+            $reduzido
+        ));
+        return $query->result_array();
+    }
+
     public function delete_by_mesano($mesano)
     {
         if (! $mesano)

@@ -3,7 +3,7 @@
   "name": "carlospauluk/ekt2bonerp",
   "type": "project",
   "require": {
-    "php": ">=5.3.7"
+    "php": ">=7.1.0"
   },
   "suggest": {
     "paragonie/random_compat": "Provides better randomness in PHP 5.x"

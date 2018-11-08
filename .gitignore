@@ -35,9 +35,9 @@ user_guide_src/cilexer/pycilexer.egg-info/*
 
 composer.phar
 
-config/production/*
+application/config/production/*
 
-config/database.php
+application/config/database.php
 
 /log
 

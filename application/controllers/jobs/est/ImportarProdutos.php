@@ -133,7 +133,8 @@ class ImportarProdutos extends CI_Controller
         
         $this->logger->info("csvsPath: [" . $this->csvsPath . "]");
         $this->logger->info("logPath: [" . $logPath . "]");
-        
+
+        $mesano = $mesano ? $mesano : (new DateTime())->format('Ym');
         $this->mesano = $mesano;
         $this->dtMesano = DateTime::createFromFormat('Ymd', $mesano . "01");
         if ($this->dtMesano && ! $this->dtMesano instanceof DateTime) {
@@ -156,6 +157,12 @@ class ImportarProdutos extends CI_Controller
             $this->importarProdutos();
             $this->gerarProdutoSaldoHistorico();
             // $this->corrigirEktDesdeAte();
+        }
+        if ($acao == 'LOJA_VIRTUAL') {
+            $this->logger->info("Iniciando a importação de produtos da LOJA VIRTUAL para o mês/ano: [" . $mesano . "]");
+            $this->dtMesano->setTime(0, 0, 0, 0);
+
+            $this->importarProdutosLojaVirtual();
         }
         if ($acao == 'DEATE') {
             $this->corrigirEktDesdeAte();
@@ -210,6 +217,36 @@ class ImportarProdutos extends CI_Controller
         
         $this->dbbonerp->trans_complete();
         
+        $this->logger->info("OK!!!");
+    }
+
+    private function importarProdutosLojaVirtual()
+    {
+        $this->logger->info("Iniciando a importação de produtos da loja virtual...");
+        $this->dbbonerp->trans_start();
+
+        $l = $this->produto_model->findProdutosLojaVirtual();
+
+        $total = count($l);
+        $this->logger->info(" >>>>>>>>>>>>>>>>>>>> " . $total . " produto(s) encontrado(s).");
+
+        $i = 0;
+        foreach ($l as $estProduto) {
+            $this->deletarSaldos($estProduto['id']);
+            $ektProduto = $this->ektproduto_model->findByMesanoAndReduzido($this->mesano, $estProduto['reduzido_ekt']);
+            if (!$ektProduto) {
+                $this->logger->info('ektproduto não encontrado para mesano = "' . $this->mesano . '" e reduzido_ekt = "' . $estProduto['reduzido_ekt'] . '"');
+                return;
+            }
+            $ektProduto = $ektProduto[0];
+            $this->logger->debug(" >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> " . ++ $i . "/" . $total);
+            $this->importarProduto($ektProduto);
+        }
+
+        $this->logger->info("Finalizando... commitando a transação...");
+
+        $this->dbbonerp->trans_complete();
+
         $this->logger->info("OK!!!");
     }
 
@@ -659,9 +696,12 @@ class ImportarProdutos extends CI_Controller
         $this->logger->info($i + " produto(s) foram 'inativados'");
     }
 
-    private function deletarSaldos()
+    private function deletarSaldos($estProdutoId=null)
     {
         $sql = 'TRUNCATE TABLE est_produto_saldo';
+        if ($estProdutoId) {
+            $sql = 'DELETE FROM est_produto_saldo WHERE produto_id = ' . $estProdutoId;
+        }
         $this->dbbonerp->query($sql) or $this->exit_db_error("Erro ao $sql");
     }
 
