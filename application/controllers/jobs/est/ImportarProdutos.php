@@ -408,7 +408,7 @@ class ImportarProdutos extends CI_Controller
         $produto['fracionado'] = $ektProduto['FRACIONADO'] == 'S' ? true : false;
 
         $produto['atual'] = $this->atual;
-        $produto['na_loja_virtual'] = isset($produto['na_loja_virtual']) === true ? true : false;
+        $produto['na_loja_virtual'] = isset($produto['na_loja_virtual']) and $produto['na_loja_virtual'] === true ? true : false;
 
         $this->logger->debug(" ________________________ save PRODUTO ");
         $produto_id = $this->produto_model->save($produto);
