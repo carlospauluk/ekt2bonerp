@@ -522,8 +522,10 @@ class ImportarProdutos extends CI_Controller
         }
         
         for ($i = 1; $i <= 12; $i ++) {
-            $this->handleProdutoSaldo($ektProduto, $produto, $i, $acumulado);
-            $acumulado = 0.0; // já salvou, não precisa mais
+            if ($ektProduto['QT' . str_pad($i, 2, '0', STR_PAD_LEFT)] !== null) {
+                $this->handleProdutoSaldo($ektProduto, $produto, $i, $acumulado);
+                $acumulado = 0.0; // já salvou, não precisa mais
+            }
         }
         
         $this->logger->debug(">>>>>>>>>>>>>>>>> OK ");
@@ -537,7 +539,7 @@ class ImportarProdutos extends CI_Controller
         
         $qtde += $acumulado;
         
-        if ($qtde != 0.0) {
+//        if ($qtde != 0.0) {
             $this->logger->debug(">>>>>>>>>>>>>>>>> handleProdutoSaldo - " . $ordem);
             
             $qryGt = $this->dbbonerp->query("SELECT gt.id FROM est_grade_tamanho gt, est_grade g WHERE gt.grade_id = g.id AND g.codigo = ? AND gt.ordem = ?", array(
@@ -558,7 +560,7 @@ class ImportarProdutos extends CI_Controller
             $this->produtosaldo_model->save($produtoSaldo) or $this->exit_db_error("Erro ao salvar na est_produto_saldo para o produto id [" . $produto['id'] . "]");
             
             $this->logger->debug(">>>>>>>>>>>>>>>>> OK");
-        }
+//        }
     }
 
     /**
