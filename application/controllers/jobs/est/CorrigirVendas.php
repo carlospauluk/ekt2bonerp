@@ -5,9 +5,11 @@ ini_set('memory_limit','2048M');
 
 class CorrigirVendas extends CI_Controller {
 
+    private $dbbonerp;
+
     public function __construct() {
         parent::__construct();
-        $this->load->database();
+        $this->dbbonerp = $this->load->database('bonerp', TRUE);
     }
     
     public function corrigir_custos_tudo() {        
@@ -104,7 +106,7 @@ class CorrigirVendas extends CI_Controller {
                 . "vi.produto_id = p.id", $mesano) or $this->exit_db_error();
         $result = $query->result_array();
 
-        
+
         $i = 0;
         foreach ($result as $r) {
             try {
@@ -170,6 +172,21 @@ class CorrigirVendas extends CI_Controller {
     public function teste($mesano) {
         $results = $this->findByReduzidoEkt(1234, '201702');
         print_r($results);
+    }
+
+    public function cadeiaUnqcs() {
+
+        $query = $this->dbbonerp->query("SELECT id FROM fin_cadeia WHERE unqc IS NULL") or $this->exit_db_error();
+        $result = $query->result_array();
+
+        $i=0;
+        foreach ($result as $r) {
+            echo "Atualizando $i\n";
+            $data['unqc'] = md5(uniqid(rand(), true));
+            $this->dbbonerp->update('fin_cadeia', $data, array('id' => $r['id'])) or $this->exit_db_error();
+        }
+        echo "\n\n\nOK";
+
     }
 
 }
