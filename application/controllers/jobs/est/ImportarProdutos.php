@@ -52,6 +52,8 @@ class ImportarProdutos extends CI_Controller
      */
     private $mesano;
 
+    private $passouMesanoPorParametro;
+
     /**
      * Se o $mesano = now
      * @var
@@ -134,6 +136,7 @@ class ImportarProdutos extends CI_Controller
         $this->logger->info("csvsPath: [" . $this->csvsPath . "]");
         $this->logger->info("logPath: [" . $logPath . "]");
 
+        $this->passouMesanoPorParametro = $mesano ? true : false;
         $mesano = $mesano ? $mesano : (new DateTime())->format('Ym');
         $this->mesano = $mesano;
         $this->dtMesano = DateTime::createFromFormat('Ymd', $mesano . "01");
@@ -564,9 +567,9 @@ class ImportarProdutos extends CI_Controller
     }
 
     /**
-     *
-     * @param
-     *            $produtoBonERP
+     * Insere o registro na est_produto_reduzidoektmesano se ainda não existir para o $this->mesano e corrige os valores do
+     * reduzido_ekt_desde e reduzido_ekt_ate.
+     * @param $produtoBonERP
      */
     private function acertaPeriodosReduzidoEKT($produtoBonERP)
     {
@@ -1158,31 +1161,33 @@ class ImportarProdutos extends CI_Controller
     }
 
     /**
+     * Se não foi passado o mesano, percorre todos desde 201401 e vai corrigindo na est_produto_reduzidoektmesano
+     * e os valores de est_produto.reduzido_ekt_desde e reduzido_ekt_ate.
      */
     private function corrigirEktDesdeAte()
     {
         $this->dbbonerp->trans_start();
 
-        $this->dbbonerp->query("TRUNCATE TABLE est_produto_reduzidoektmesano");
-        $this->dbbonerp->query("UPDATE est_produto SET reduzido_ekt_desde = NULL, reduzido_ekt_ate = NULL");
-
-        $mesano_ini = "201401";
-        $hoje = new DateTime();
-        $mesano_fim = $hoje->format("Ym");
-        $mesesanos = Datetime_utils::mesano_list($mesano_ini, $mesano_fim);
-
-        // Depois que comecei a tratar descrições diferentes como produtos diferentes, esta query deve sempre NÃO retornar nada.
-        // select reduzido_ekt, descricao, count(*) as qtde from est_produto group by reduzido_ekt, descricao having qtde > 1;
+        if (!$this->passouMesanoPorParametro) {
+            $this->dbbonerp->query("TRUNCATE TABLE est_produto_reduzidoektmesano");
+            $mesano_ini = "201401";
+            $hoje = new DateTime();
+            $mesano_fim = $hoje->format("Ym");
+            $mesesanos = Datetime_utils::mesano_list($mesano_ini, $mesano_fim);
+            $this->dbbonerp->query("UPDATE est_produto SET reduzido_ekt_desde = NULL, reduzido_ekt_ate = NULL");
+        } else {
+            $this->dbbonerp->query("DELETE FROM est_produto_reduzidoektmesano WHERE mesano = ?", [$this->mesano]);
+            $mesesanos = [$this->mesano];
+        }
 
         foreach ($mesesanos as $mesano) {
 
             $this->mesano = $mesano;
-            $query = $this->dbekt->get_where("ekt_produto", array(
-                'mesano' => $mesano
-            ));
-            $result = $query->result_array();
-
             // Pega todos os produtos da ekt_produto para o $mesano
+            $query = $this->dbekt->get_where("ekt_produto", ['mesano' => $mesano]);
+            $result = $query->result_array();
+            $total = count($result);
+
             $i = 1;
             foreach ($result as $r) {
                 try {
@@ -1196,45 +1201,14 @@ class ImportarProdutos extends CI_Controller
                     if ($qtde != 1) {
                         throw new Exception("Erro. Qtde deveria ser exatamente 1 para reduzido = '" . $r['REDUZIDO'] . "' e descricao = '" . $r['DESCRICAO'] . "'. QTDE='" . $qtde . "'");
                     }
+                    //
                     $this->acertaPeriodosReduzidoEKT($result[0]);
-                    $this->logger->info($i++ . " (" . $r['id'] . ")");
+                    $this->logger->info(str_pad($i++, 6, '0', STR_PAD_LEFT) . "/" . str_pad($total, 6, '0', STR_PAD_LEFT) . " (" . $r['id'] . ")");
                 } catch (Exception $e) {
                     print_r($e->getMessage());
                     exit();
                 }
             }
-        }
-
-        // Pego TODOS os produtos da est_produto
-        $prods = $this->dbbonerp->query("SELECT id, reduzido_ekt_desde, reduzido_ekt_ate FROM est_produto WHERE reduzido_ekt is not null AND reduzido_ekt != '88888'")->result_array();
-        // $prods = $this->dbbonerp->query("SELECT id, reduzido_ekt_desde, reduzido_ekt_ate FROM est_produto WHERE reduzido_ekt = '2173'")->result_array();
-
-        $i = 0;
-        $total = count($prods);
-
-        foreach ($prods as $prod) {
-
-            // Verifico a lista de mesesanos que foi montada logo acima
-            $ekts = $this->dbbonerp->query("SELECT mesano FROM est_produto_reduzidoektmesano WHERE produto_id = ?", array(
-                $prod['id']
-            ))->result_array();
-
-            if (!$ekts or count($ekts) < 1) {
-                $this->logger->info("est_produto_reduzidoektmesano não encontrado para est_produto.id = [" . $prod['id'] . "]");
-                return;
-            }
-
-            $desde = DateTime::createFromFormat('Ym', $ekts[0]['mesano'])->format('Y-m-') . "01";
-            $ate = DateTime::createFromFormat('Ym', $ekts[count($ekts) - 1]['mesano'])->format('Y-m-t');
-
-            $prod['reduzido_ekt_desde'] = $desde;
-            $prod['reduzido_ekt_ate'] = $ate;
-
-            $this->dbbonerp->update('est_produto', $prod, array(
-                'id' => $prod['id']
-            )) or $this->exit_db_error("Erro ao atualizar 'reduzido_ekt_desde'");
-
-            $this->logger->debug(" >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> " . ++$i . "/" . $total);
         }
 
         $this->logger->info("Finalizando... commitando a transação...");
