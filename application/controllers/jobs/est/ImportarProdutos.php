@@ -9,7 +9,8 @@ require_once ('./application/libraries/util/Datetime_utils.php');
  *
  * Pela linha de comando, chamar com:
  *
- * WINDOWS:
+ * (debug? export/set XDEBUG_CONFIG="idekey=session_name")
+ *
  * set EKT_CSVS_PATH=\\10.1.1.100\export
  * set EKT_LOG_PATH=C:\ekt2bonerp\log\
  * set XDEBUG_CONFIG="idekey=session_name"
@@ -50,6 +51,12 @@ class ImportarProdutos extends CI_Controller
      * @var string
      */
     private $mesano;
+
+    /**
+     * Se o $mesano = now
+     * @var
+     */
+    private $atual;
 
     /**
      * Parseado do $mesano para um DateTime.
@@ -126,7 +133,8 @@ class ImportarProdutos extends CI_Controller
         
         $this->logger->info("csvsPath: [" . $this->csvsPath . "]");
         $this->logger->info("logPath: [" . $logPath . "]");
-        
+
+        $mesano = $mesano ? $mesano : (new DateTime())->format('Ym');
         $this->mesano = $mesano;
         $this->dtMesano = DateTime::createFromFormat('Ymd', $mesano . "01");
         if ($this->dtMesano && ! $this->dtMesano instanceof DateTime) {
@@ -135,7 +143,10 @@ class ImportarProdutos extends CI_Controller
             $this->logger->closeLog();
             exit();
         }
-        
+
+        $this->atual = $this->mesano == $this->agora->format('Ym');
+        $this->logger->info("Importando 'atual'? " . ($this->atual ? 'SIM' : 'NÃO'));
+
         if ($acao == 'PROD') {
             $this->logger->info("Iniciando a importação para o mês/ano: [" . $mesano . "]");
             $this->dtMesano->setTime(0, 0, 0, 0);
@@ -146,6 +157,12 @@ class ImportarProdutos extends CI_Controller
             $this->importarProdutos();
             $this->gerarProdutoSaldoHistorico();
             // $this->corrigirEktDesdeAte();
+        }
+        if ($acao == 'LOJA_VIRTUAL') {
+            $this->logger->info("Iniciando a importação de produtos da LOJA VIRTUAL para o mês/ano: [" . $mesano . "]");
+            $this->dtMesano->setTime(0, 0, 0, 0);
+
+            $this->importarProdutosLojaVirtual();
         }
         if ($acao == 'DEATE') {
             $this->corrigirEktDesdeAte();
@@ -200,6 +217,36 @@ class ImportarProdutos extends CI_Controller
         
         $this->dbbonerp->trans_complete();
         
+        $this->logger->info("OK!!!");
+    }
+
+    private function importarProdutosLojaVirtual()
+    {
+        $this->logger->info("Iniciando a importação de produtos da loja virtual...");
+        $this->dbbonerp->trans_start();
+
+        $l = $this->produto_model->findProdutosLojaVirtual();
+
+        $total = count($l);
+        $this->logger->info(" >>>>>>>>>>>>>>>>>>>> " . $total . " produto(s) encontrado(s).");
+
+        $i = 0;
+        foreach ($l as $estProduto) {
+            $this->deletarSaldos($estProduto['id']);
+            $ektProduto = $this->ektproduto_model->findByMesanoAndReduzido($this->mesano, $estProduto['reduzido_ekt']);
+            if (!$ektProduto) {
+                $this->logger->info('ektproduto não encontrado para mesano = "' . $this->mesano . '" e reduzido_ekt = "' . $estProduto['reduzido_ekt'] . '"');
+                return;
+            }
+            $ektProduto = $ektProduto[0];
+            $this->logger->debug(" >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> " . ++ $i . "/" . $total);
+            $this->importarProduto($ektProduto);
+        }
+
+        $this->logger->info("Finalizando... commitando a transação...");
+
+        $this->dbbonerp->trans_complete();
+
         $this->logger->info("OK!!!");
     }
 
@@ -359,7 +406,10 @@ class ImportarProdutos extends CI_Controller
         $produto['tipo_tributacao'] = "T";
         $produto['ncm'] = $ektProduto['NCM'] ? $ektProduto['NCM'] : "62179000";
         $produto['fracionado'] = $ektProduto['FRACIONADO'] == 'S' ? true : false;
-        
+
+        $produto['atual'] = $this->atual;
+        $produto['na_loja_virtual'] = (isset($produto['na_loja_virtual']) and (boolval($produto['na_loja_virtual']) === true)) ? true : false;
+
         $this->logger->debug(" ________________________ save PRODUTO ");
         $produto_id = $this->produto_model->save($produto);
         $produto['id'] = $produto_id;
@@ -472,8 +522,10 @@ class ImportarProdutos extends CI_Controller
         }
         
         for ($i = 1; $i <= 12; $i ++) {
-            $this->handleProdutoSaldo($ektProduto, $produto, $i, $acumulado);
-            $acumulado = 0.0; // já salvou, não precisa mais
+            if ($ektProduto['QT' . str_pad($i, 2, '0', STR_PAD_LEFT)] !== null) {
+                $this->handleProdutoSaldo($ektProduto, $produto, $i, $acumulado);
+                $acumulado = 0.0; // já salvou, não precisa mais
+            }
         }
         
         $this->logger->debug(">>>>>>>>>>>>>>>>> OK ");
@@ -487,8 +539,8 @@ class ImportarProdutos extends CI_Controller
         
         $qtde += $acumulado;
         
-        if ($qtde != 0.0) {
-            $this->logger->debug(">>>>>>>>>>>>>>>>> handleProdutoSaldo - " . $ordem);
+//        if ($qtde != 0.0) {
+            $this->logger->debug(">>>>>>>>>>>>>>>>> handleProdutoSaldo. QT" . $ordemStr . ": Qtde: '" . $qtde . "'");
             
             $qryGt = $this->dbbonerp->query("SELECT gt.id FROM est_grade_tamanho gt, est_grade g WHERE gt.grade_id = g.id AND g.codigo = ? AND gt.ordem = ?", array(
                 $ektProduto['GRADE'],
@@ -502,13 +554,13 @@ class ImportarProdutos extends CI_Controller
             
             $produtoSaldo['produto_id'] = $produto['id'];
             $produtoSaldo['grade_tamanho_id'] = $gt['id'];
-            $produtoSaldo['qtde'] = $ektProduto['QT' . $ordemStr] + $acumulado;
+            $produtoSaldo['qtde'] = $qtde;
             $produtoSaldo['selec'] = $ektProduto['F' . $ordem] == 'S';
             
             $this->produtosaldo_model->save($produtoSaldo) or $this->exit_db_error("Erro ao salvar na est_produto_saldo para o produto id [" . $produto['id'] . "]");
             
             $this->logger->debug(">>>>>>>>>>>>>>>>> OK");
-        }
+//        }
     }
 
     /**
@@ -647,9 +699,15 @@ class ImportarProdutos extends CI_Controller
         $this->logger->info($i + " produto(s) foram 'inativados'");
     }
 
-    private function deletarSaldos()
+    private function deletarSaldos($estProdutoId=null)
     {
+	$sql = "DELETE FROM est_produto_reduzidoektmesano WHERE mesano = ?";
+	$this->dbbonerp->query($sql, [$this->mesano]);
+
         $sql = 'TRUNCATE TABLE est_produto_saldo';
+        if ($estProdutoId) {
+            $sql = 'DELETE FROM est_produto_saldo WHERE produto_id = ' . $estProdutoId;
+        }
         $this->dbbonerp->query($sql) or $this->exit_db_error("Erro ao $sql");
     }
 

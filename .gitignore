@@ -35,8 +35,11 @@ user_guide_src/cilexer/pycilexer.egg-info/*
 
 composer.phar
 
-config/production/*
+application/config/production/*
 
+application/config/database.php
+
+/log
 
 
 /index.php
