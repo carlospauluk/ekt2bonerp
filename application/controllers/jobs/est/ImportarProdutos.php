@@ -198,7 +198,7 @@ class ImportarProdutos extends CI_Controller
 
         $l = $this->ektproduto_model->findByMesano($this->mesano);
 
-        $l = $this->dbekt->query("SELECT * FROM ekt_produto WHERE reduzido = 912 AND mesano = ?", array($this->mesano))->result_array();
+        // $l = $this->dbekt->query("SELECT * FROM ekt_produto WHERE reduzido = 912 AND mesano = ?", array($this->mesano))->result_array();
 
         $total = count($l);
         $this->logger->info(" >>>>>>>>>>>>>>>>>>>> " . $total . " produto(s) encontrado(s).");
@@ -609,8 +609,7 @@ class ImportarProdutos extends CI_Controller
         } else {
             // verifica se o mesano é menor que o reduzido_ekt_desde
             // se for, seta o reduzido_ekt_desde pro mesano
-            if ((!isset($produtoBonERP['reduzido_ekt_desde']) or !$produtoBonERP['reduzido_ekt_desde'])
-                or (isset($produtoBonERP['reduzido_ekt_desde']) and $produtoBonERP['reduzido_ekt_desde'] != null)) {
+            if (isset($produtoBonERP['reduzido_ekt_desde']) and $produtoBonERP['reduzido_ekt_desde'] != null) {
                 $dt_ekt_desde = DateTime::createFromFormat('Y-m-d', $produtoBonERP['reduzido_ekt_desde']);
                 $dt_ekt_desde->setTime(0, 0, 0, 0);
                 if ($this->dtMesano < $dt_ekt_desde) {
@@ -668,48 +667,6 @@ class ImportarProdutos extends CI_Controller
         }
 
         return $qtdeTotal;
-    }
-
-    private function marcarProdutosInativos()
-    {
-        // try {
-        $this->logger->info(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> marcarProdutosInativos");
-
-        $sql = "SELECT id, reduzido_ekt FROM est_produto WHERE reduzido_ekt_ate IS NULL";
-        $qryProds = $this->dbbonerp->query($sql);
-        $prods = $qryProds->result_array();
-
-        $this->logger->info("Produtos encontrados: " . count($prods));
-
-        $i = 0;
-
-        // percorre todos os produtos do BonERP
-        foreach ($prods as $p) {
-
-            $produtoId = $p['id'];
-            $reduzidoEkt = $p['reduzido_ekt'];
-
-            $this->logger->debug("PESQUISANDO produtoId: " . $produtoId . " - reduzidoEkt: " . $reduzidoEkt);
-
-            $ektProduto = $ektproduto_model->findByReduzido($reduzidoEkt, $mesImport);
-
-            if (!$ektProduto == null) {
-                $this->logger->debug("Produto: " . $reduzidoEkt . " não encontrado");
-                $produto = $this->produto_model->findById($produtoId);
-
-                $dtMesImport = clone $this->dtMesImport;
-                $dtMesImport->setTime(0, 0, 0, 0);
-                $dtMesImport->sub(new \DateInterval('1 month'));
-                $ultimoDiaMesAnterior = $dtMesImport->format('Y-m-t');
-
-                $produto['reduzido_ekt_ate'] = $ultimoDiaMesAnterior;
-
-                $this->produto_model->save($produto);
-                $i++;
-            }
-        }
-
-        $this->logger->info($i + " produto(s) foram 'inativados'");
     }
 
     private function deletarSaldos($estProdutoId = null)
@@ -1041,7 +998,7 @@ class ImportarProdutos extends CI_Controller
             $produtoSaldo['user_inserted_id'] = 1;
             $produtoSaldo['user_updated_id'] = 1;
 
-            $this->dbbonerp->insert('est_produto_saldo_historico', $produtoSaldo) or $this->exit_db_error("Erro ao inserir na est_produto_reduzidoektmesano. produto id [" . $produtoId . "]");
+            $this->dbbonerp->insert('est_produto_saldo_historico', $produtoSaldo) or $this->exit_db_error("Erro ao inserir na est_produto_reduzidoektmesano. produto id [" . $produto_id . "]");
         }
 
         $qry = $this->dbbonerp->query("CALL sp_total_inventario(?,@a,@b,@c)", array(
