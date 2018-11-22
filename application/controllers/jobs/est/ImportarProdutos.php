@@ -198,7 +198,7 @@ class ImportarProdutos extends CI_Controller
 
         $l = $this->ektproduto_model->findByMesano($this->mesano);
 
-        // $l = $this->dbekt->query("SELECT * FROM ekt_produto WHERE reduzido = 912 AND mesano = ?", array($this->mesano))->result_array();
+        // $l = $this->dbekt->query("SELECT * FROM ekt_produto WHERE reduzido = 1507 AND mesano = ?", array($this->mesano))->result_array();
 
         $total = count($l);
         $this->logger->info(" >>>>>>>>>>>>>>>>>>>> " . $total . " produto(s) encontrado(s).");
@@ -578,7 +578,7 @@ class ImportarProdutos extends CI_Controller
         $corrigiu_algo_aqui = false;
         $produtoId = $produtoBonERP['id'];
         $reduzido_ekt = $produtoBonERP['reduzido_ekt'];
-        $this->logger->debug("LIDANDO COM 'depara' [" . $produtoId . "]... ");
+        $this->logger->debug("LIDANDO COM 'depara' [" . $produtoId . "]......................................................................... " . $this->mesano);
 
         // Verifica se já tem registro marcando este produto no mesano
         $sql = "SELECT * FROM est_produto_reduzidoektmesano WHERE produto_id = ? AND mesano = ? AND reduzido_ekt = ?";
@@ -1140,8 +1140,10 @@ class ImportarProdutos extends CI_Controller
         foreach ($mesesanos as $mesano) {
 
             $this->mesano = $mesano;
+            $this->dtMesano = DateTime::createFromFormat('Ymd', $mesano . '01');
+            $this->dtMesano->setTime(0,0,0,0);
             // Pega todos os produtos da ekt_produto para o $mesano
-            $query = $this->dbekt->get_where("ekt_produto", ['mesano' => $mesano]);
+            $query = $this->dbekt->get_where("ekt_produto", ['mesano' => $mesano]);//, 'reduzido' => 1507]);
             $result = $query->result_array();
             $total = count($result);
 
