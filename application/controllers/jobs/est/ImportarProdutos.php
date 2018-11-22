@@ -1149,7 +1149,7 @@ class ImportarProdutos extends CI_Controller
             foreach ($result as $r) {
                 try {
                     // Para cada ekt_produto, encontra o est_produto
-                    $query = $this->dbbonerp->query("SELECT * FROM est_produto WHERE reduzido_ekt = ? AND trim(descricao) LIKE ? ", array(
+                    $query = $this->dbbonerp->query("SELECT * FROM est_produto WHERE reduzido_ekt = ? AND trim(descricao) LIKE ?", array(
                         $r['REDUZIDO'],
                         trim($r['DESCRICAO'])
                     ));
