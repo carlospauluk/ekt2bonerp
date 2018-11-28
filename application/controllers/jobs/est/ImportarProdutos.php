@@ -409,7 +409,7 @@ class ImportarProdutos extends CI_Controller
 
         $produto['atual'] = $this->atual;
         $produto['na_loja_virtual'] = (isset($produto['na_loja_virtual']) and (boolval($produto['na_loja_virtual']) === true)) ? true : false;
-
+        $this->logger->debug(" _______________________________________________________________________ Na loja virtual: [" . $produto['na_loja_virtual'] . "]");
         $this->logger->debug(" ________________________ save PRODUTO ");
         $produto_id = $this->produto_model->save($produto);
         $produto['id'] = $produto_id;
