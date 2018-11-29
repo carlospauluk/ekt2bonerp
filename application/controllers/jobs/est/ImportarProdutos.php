@@ -156,9 +156,13 @@ class ImportarProdutos extends CI_Controller
             $this->logger->info('LIMPANDO A est_produto_saldo...');
             $this->deletarSaldos();
             $this->logger->info("OK!!!");
-
             $this->importarProdutos();
             $this->gerarProdutoSaldoHistorico();
+
+            $this->logger->info('CORRIGINDO campo est_produto.atual...');
+            $this->corrigirCampoAtual();
+            $this->logger->info('OK!!!');
+
             // $this->corrigirEktDesdeAte();
         }
         if ($acao == 'LOJA_VIRTUAL') {
@@ -679,6 +683,13 @@ class ImportarProdutos extends CI_Controller
             $sql = 'DELETE FROM est_produto_saldo WHERE produto_id = ' . $estProdutoId;
         }
         $this->dbbonerp->query($sql) or $this->exit_db_error("Erro ao $sql");
+    }
+
+    private function corrigirCampoAtual()
+    {
+        $mesanoAtual = (new DateTime())->format('Ym');
+        $this->dbbonerp->query('UPDATE est_produto SET atual = false');
+        $this->dbbonerp->query('UPDATE est_produto SET atual = true WHERE id IN (SELECT produto_id FROM est_produto_reduzidoektmesano WHERE mesano = ' . $mesanoAtual . ')');
     }
 
     private function getMesAnoList($dtIni, $dtFim)
