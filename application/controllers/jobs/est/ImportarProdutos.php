@@ -604,6 +604,11 @@ class ImportarProdutos extends CI_Controller
     private function corrigeReduzidoEktDesdeAte($mesano = null)
     {
         $this->logger->info('Iniciando correção de reduzido_ekt_desde e reduzido_ekt_ate (mesano = "' . $mesano . '")');
+
+        $this->logger->info('UPDATE est_produto SET reduzido_ekt_desde = NULL, reduzido_ekt_ate = NULL');
+        $this->dbbonerp->query("UPDATE est_produto SET reduzido_ekt_desde = NULL, reduzido_ekt_ate = NULL");
+        $this->logger->info('OK');
+
         if ($mesano) {
             $sql = "SELECT * FROM est_produto WHERE id IN (SELECT produto_id FROM est_produto_reduzidoektmesano WHERE mesano = ?)";
             $rs = $this->dbbonerp->query($sql, [$mesano])->result_array();
@@ -612,6 +617,8 @@ class ImportarProdutos extends CI_Controller
             $rs = $this->dbbonerp->query($sql)->result_array();
         }
 
+        $i=1;
+        $total = count($rs);
         foreach ($rs as $estProduto) {
             $sql = "SELECT * FROM est_produto_reduzidoektmesano WHERE produto_id = ? ORDER BY mesano";
             $r = $this->dbbonerp->query($sql, [$estProduto['id']])->result_array();
@@ -628,6 +635,9 @@ class ImportarProdutos extends CI_Controller
             $this->dbbonerp->update('est_produto', $estProduto, array(
                 'id' => $estProduto['id']
             )) or $this->exit_db_error("Erro ao atualizar 'reduzido_ekt_desde' e 'reduzido_ekt_ate'");
+
+
+            $this->logger->info($mesano . ' ... ' . str_pad($estProduto['reduzido_ekt'], 6, 0, STR_PAD_LEFT) . ' ....................................................................... ' . str_pad($i++, 6, '0', STR_PAD_LEFT) . "/" . str_pad($total, 6, '0', STR_PAD_LEFT));
 
         }
         $this->logger->info('OK');
@@ -1136,13 +1146,7 @@ class ImportarProdutos extends CI_Controller
         $mesano_fim = $hoje->format("Ym");
         $mesesanos = Datetime_utils::mesano_list($mesano_ini, $mesano_fim);
 
-        $this->logger->info('UPDATE est_produto SET reduzido_ekt_desde = NULL, reduzido_ekt_ate = NULL');
-        $this->dbbonerp->query("UPDATE est_produto SET reduzido_ekt_desde = NULL, reduzido_ekt_ate = NULL");
-        $this->logger->info('OK');
-
         foreach ($mesesanos as $mesano) {
-            $this->logger->info('******* mesano = ' . $mesano);
-
             $this->mesano = $mesano;
             $this->dtMesano = DateTime::createFromFormat('Ymd', $mesano . '01');
             $this->dtMesano->setTime(0, 0, 0, 0);
