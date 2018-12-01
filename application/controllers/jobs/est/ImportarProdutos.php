@@ -153,10 +153,13 @@ class ImportarProdutos extends CI_Controller
             $this->logger->info('LIMPANDO A est_produto_saldo...');
             $this->deletarSaldos();
             $this->logger->info("OK!!!");
-
             $this->importarProdutos();
             $this->gerarProdutoSaldoHistorico();
 
+            $this->corrigeReduzidoEktDesdeAte($this->mesano);
+            $this->logger->info('CORRIGINDO campo est_produto.atual...');
+            $this->corrigirCampoAtual();
+            $this->logger->info('OK!!!');
         }
         if ($acao == 'LOJA_VIRTUAL') {
             $this->logger->info("Iniciando a importação de produtos da LOJA VIRTUAL para o mês/ano: [" . $mesano . "]");
@@ -166,6 +169,7 @@ class ImportarProdutos extends CI_Controller
         }
         if ($acao == 'DEATE') {
             $this->corrigirProdutosReduzidoEktDesdeAte();
+            $this->corrigirCampoAtual();
         }
         if ($acao == 'PRECOS') {
             $this->corrigirPrecos();
@@ -402,7 +406,7 @@ class ImportarProdutos extends CI_Controller
 
         $produto['atual'] = $this->atual;
         $produto['na_loja_virtual'] = (isset($produto['na_loja_virtual']) and (boolval($produto['na_loja_virtual']) === true)) ? true : false;
-
+        $this->logger->debug(" _______________________________________________________________________ Na loja virtual: [" . $produto['na_loja_virtual'] . "]");
         $this->logger->debug(" ________________________ save PRODUTO ");
         $produto_id = $this->produto_model->save($produto);
         $produto['id'] = $produto_id;
@@ -665,6 +669,13 @@ class ImportarProdutos extends CI_Controller
             $sql = 'DELETE FROM est_produto_saldo WHERE produto_id = ' . $estProdutoId;
         }
         $this->dbbonerp->query($sql) or $this->exit_db_error("Erro ao $sql");
+    }
+
+    private function corrigirCampoAtual()
+    {
+        $mesanoAtual = (new DateTime())->format('Ym');
+        $this->dbbonerp->query('UPDATE est_produto SET atual = false');
+        $this->dbbonerp->query('UPDATE est_produto SET atual = true WHERE id IN (SELECT produto_id FROM est_produto_reduzidoektmesano WHERE mesano = ' . $mesanoAtual . ')');
     }
 
     private function getMesAnoList($dtIni, $dtFim)
