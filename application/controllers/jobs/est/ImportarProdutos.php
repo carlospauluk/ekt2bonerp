@@ -154,9 +154,10 @@ class ImportarProdutos extends CI_Controller
             $this->logger->info('LIMPANDO A est_produto_saldo...');
             $this->deletarSaldos();
             $this->logger->info("OK!!!");
+
             $this->importarProdutos();
+
             $this->gerarProdutoSaldoHistorico();
-            $this->corrigirCampoAtual(); // acerta o campo est_produto.atual
 
             $this->logger->info('CORRIGINDO campo est_produto.atual...');
             $this->corrigirCampoAtual();
@@ -203,7 +204,6 @@ class ImportarProdutos extends CI_Controller
         $this->dbbonerp->trans_start();
 
         $l = $this->ektproduto_model->findByMesano($this->mesano);
-
         // $l = $this->dbekt->query("SELECT * FROM ekt_produto WHERE reduzido = 1507 AND mesano = ?", array($this->mesano))->result_array();
 
         $total = count($l);
@@ -221,11 +221,8 @@ class ImportarProdutos extends CI_Controller
             $this->logger->debug(" >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> " . ++$i . "/" . $total);
             $this->importarProduto($ektProduto);
         }
-
         $this->logger->info("Finalizando... commitando a transação...");
-
         $this->dbbonerp->trans_complete();
-
         $this->logger->info("OK!!!");
     }
 
@@ -253,9 +250,7 @@ class ImportarProdutos extends CI_Controller
         }
 
         $this->logger->info("Finalizando... commitando a transação...");
-
         $this->dbbonerp->trans_complete();
-
         $this->logger->info("OK!!!");
     }
 
@@ -282,11 +277,6 @@ class ImportarProdutos extends CI_Controller
                 $descricao_ekt = trim($ektProduto['DESCRICAO']);
                 $descricao = trim($mesmoReduzido['descricao']);
 
-                // similar_text($descricao_ekt, $descricao, $percent);
-                // $percent = $this->similarity($descricao_ekt,$descricao);
-
-                //
-                // if ( $percent >= 0.75 or (! $mesmoReduzido['reduzido_ekt_ate']) and $mesmoReduzido['reduzido_ekt_desde'] == $this->dtMesImport) {
                 if ($descricao_ekt == $descricao) {
                     // PRODUTO JÁ EXISTENTE
                     $this->logger->debug("Achou o mesmo. Atualizando...");
@@ -295,7 +285,6 @@ class ImportarProdutos extends CI_Controller
                     $mesmoReduzido = $this->produto_model->findby_id($mesmoReduzido['id']); // recarrego para pegar oq foi alterado
 
                     $this->saveGrade($ektProduto, $mesmoReduzido);
-                    // $mesmoReduzido = $this->produto_model->findby_id($mesmoReduzido['id']);
 
                     // conferindo se as qtdes na grade batem
                     $qtdeTotal_ektProduto = $this->getQtdeTotalEktProduto($ektProduto);
@@ -306,9 +295,7 @@ class ImportarProdutos extends CI_Controller
                     }
 
                     $this->insereNaReduzidoEktMesano($mesmoReduzido);
-
                     $this->atualizados++;
-
                     $this->logger->debug("OK!!!");
                     break; // já achou, não precisa continuar procurando
                 }
@@ -323,6 +310,13 @@ class ImportarProdutos extends CI_Controller
         }
     }
 
+    /**
+     * Monta o est_produto.reduzido
+     *
+     * @param $ektProduto
+     * @param null $produto
+     * @return string|void
+     */
     private function handleReduzido($ektProduto, $produto = null)
     {
         if ($produto and array_key_exists('reduzido', $produto) and $produto['reduzido']) {
