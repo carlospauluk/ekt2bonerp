@@ -120,6 +120,7 @@ class ImportarProdutos extends CI_Controller
      * @param $mesano (yyyymm)
      * @param $acao (PROD,
      *            DEATE)
+     * @throws Exception
      */
     public function importar($acao, $mesano = null)
     {
@@ -610,29 +611,39 @@ class ImportarProdutos extends CI_Controller
         $this->logger->info('OK');
 
         if ($mesano) {
-            $sql = "SELECT * FROM est_produto WHERE id IN (SELECT produto_id FROM est_produto_reduzidoektmesano WHERE mesano = ?)";
+            $sql = "SELECT * FROM est_produto WHERE reduzido_ekt != 88888 AND TRIM(descricao) != '' AND id IN (SELECT produto_id FROM est_produto_reduzidoektmesano WHERE mesano = ?)";
             $rs = $this->dbbonerp->query($sql, [$mesano])->result_array();
         } else {
-            $sql = "SELECT * FROM est_produto";
+            $sql = "SELECT * FROM est_produto WHERE reduzido_ekt != 88888 AND TRIM(descricao) != ''";
             $rs = $this->dbbonerp->query($sql)->result_array();
+        }
+
+        // Monto toda a tabela num array para não precisar executar um SELECT pra cada produto no foreach.
+        $sql = "SELECT * FROM est_produto_reduzidoektmesano ORDER BY produto_id, mesano";
+        $todos = $this->dbbonerp->query($sql)->result_array();
+        if (!$todos or count($todos) < 1) {
+            throw new \Exception("Nenhum registro encontrado na est_produto_reduzidoektmesano");
+        }
+        $reduzidosektmesano = [];
+        foreach ($todos as $t) {
+            if (!array_key_exists($t['produto_id'], $reduzidosektmesano)) {
+                $reduzidosektmesano[$t['produto_id']] = [];
+            }
+            array_push($reduzidosektmesano[$t['produto_id']], $t['mesano']);
         }
 
         $i=1;
         $total = count($rs);
         foreach ($rs as $estProduto) {
-            $sql = "SELECT * FROM est_produto_reduzidoektmesano WHERE produto_id = ? ORDER BY mesano";
-            $r = $this->dbbonerp->query($sql, [$estProduto['id']])->result_array();
-            if (!$r or count($r) < 1) {
-                throw new \Exception("Nenhum registro encontrado na est_produto_reduzidoektmesano para produto_id = '" . $estProduto['id'] . "'");
-            }
+            $mesesanos = $reduzidosektmesano[$estProduto['id']];
 
-            $mesano_ini = $r[0]['mesano'];
-            $mesano_fim = $r[count($r) - 1]['mesano'];
+            $mesano_ini = $mesesanos[0];
+            $mesano_fim = $mesesanos[count($mesesanos) - 1];
 
-            $estProduto['reduzido_ekt_desde'] = (\DateTime::createFromFormat('Ym', $mesano_ini))->format('Y-m-d');
-            $estProduto['reduzido_ekt_ate'] = (\DateTime::createFromFormat('Ym', $mesano_fim))->format('Y-m-d');
+            $estProduto_['reduzido_ekt_desde'] = (\DateTime::createFromFormat('Ym', $mesano_ini))->format('Y-m-d');
+            $estProduto_['reduzido_ekt_ate'] = (\DateTime::createFromFormat('Ym', $mesano_fim))->format('Y-m-t');
 
-            $this->dbbonerp->update('est_produto', $estProduto, array(
+            $this->dbbonerp->update('est_produto', $estProduto_, array(
                 'id' => $estProduto['id']
             )) or $this->exit_db_error("Erro ao atualizar 'reduzido_ekt_desde' e 'reduzido_ekt_ate'");
 
@@ -640,6 +651,8 @@ class ImportarProdutos extends CI_Controller
             $this->logger->info($mesano . ' ... ' . str_pad($estProduto['reduzido_ekt'], 6, 0, STR_PAD_LEFT) . ' ....................................................................... ' . str_pad($i++, 6, '0', STR_PAD_LEFT) . "/" . str_pad($total, 6, '0', STR_PAD_LEFT));
 
         }
+        $mesano_atual = $this->agora->format('Ym');
+        $this->dbbonerp->query("UPDATE est_produto SET reduzido_ekt_ate = NULL WHERE DATE_FORMAT(reduzido_ekt_ate, '%Y%m') = ?", [$mesano_atual]);
         $this->logger->info('OK');
     }
 
