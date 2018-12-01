@@ -156,8 +156,8 @@ class ImportarProdutos extends CI_Controller
             $this->logger->info("OK!!!");
             $this->importarProdutos();
             $this->gerarProdutoSaldoHistorico();
+            $this->corrigirCampoAtual(); // acerta o campo est_produto.atual
 
-            $this->corrigeReduzidoEktDesdeAte($this->mesano);
             $this->logger->info('CORRIGINDO campo est_produto.atual...');
             $this->corrigirCampoAtual();
             $this->logger->info('OK!!!');
@@ -572,9 +572,6 @@ class ImportarProdutos extends CI_Controller
      */
     private function insereNaReduzidoEktMesano($produtoBonERP)
     {
-        $this->logger->debug(">>>>>>>> ACERTANDO REDUZIDOS EKT: " . $produtoBonERP['reduzido_ekt']);
-
-        $corrigiu_algo_aqui = false;
         $produtoId = $produtoBonERP['id'];
         $reduzido_ekt = $produtoBonERP['reduzido_ekt'];
 
@@ -599,24 +596,18 @@ class ImportarProdutos extends CI_Controller
     /**
      * Corrige os campos reduzido_ekt_desde e reduzido_ekt_ate (de toda a est_produto ou somente dos registros que são do mesano passado).
      *
-     * @param null $mesano
      * @throws Exception
      */
-    private function corrigeReduzidoEktDesdeAte($mesano = null)
+    private function corrigeReduzidoEktDesdeAte()
     {
-        $this->logger->info('Iniciando correção de reduzido_ekt_desde e reduzido_ekt_ate (mesano = "' . $mesano . '")');
+        $this->logger->info('Iniciando correção de reduzido_ekt_desde e reduzido_ekt_ate');
 
         $this->logger->info('UPDATE est_produto SET reduzido_ekt_desde = NULL, reduzido_ekt_ate = NULL');
         $this->dbbonerp->query("UPDATE est_produto SET reduzido_ekt_desde = NULL, reduzido_ekt_ate = NULL");
         $this->logger->info('OK');
 
-        if ($mesano) {
-            $sql = "SELECT * FROM est_produto WHERE reduzido_ekt != 88888 AND TRIM(descricao) != '' AND id IN (SELECT produto_id FROM est_produto_reduzidoektmesano WHERE mesano = ?)";
-            $rs = $this->dbbonerp->query($sql, [$mesano])->result_array();
-        } else {
-            $sql = "SELECT * FROM est_produto WHERE reduzido_ekt != 88888 AND TRIM(descricao) != ''";
-            $rs = $this->dbbonerp->query($sql)->result_array();
-        }
+        $sql = "SELECT * FROM est_produto WHERE reduzido_ekt != 88888 AND TRIM(descricao) != ''";
+        $rs = $this->dbbonerp->query($sql)->result_array();
 
         // Monto toda a tabela num array para não precisar executar um SELECT pra cada produto no foreach.
         $sql = "SELECT * FROM est_produto_reduzidoektmesano ORDER BY produto_id, mesano";
@@ -632,7 +623,7 @@ class ImportarProdutos extends CI_Controller
             array_push($reduzidosektmesano[$t['produto_id']], $t['mesano']);
         }
 
-        $i=1;
+        $i = 1;
         $total = count($rs);
         foreach ($rs as $estProduto) {
             $mesesanos = $reduzidosektmesano[$estProduto['id']];
