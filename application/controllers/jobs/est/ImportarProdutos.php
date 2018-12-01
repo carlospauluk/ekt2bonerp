@@ -622,12 +622,12 @@ class ImportarProdutos extends CI_Controller
             $mesano_ini = $r[0]['mesano'];
             $mesano_fim = $r[count($r) - 1]['mesano'];
 
-            $produtoBonERP['reduzido_ekt_desde'] = (\DateTime::createFromFormat('Ym', $mesano_ini))->format('Y-m-d');
-            $produtoBonERP['reduzido_ekt_ate'] = (\DateTime::createFromFormat('Ym', $mesano_fim))->format('Y-m-d');
+            $estProduto['reduzido_ekt_desde'] = (\DateTime::createFromFormat('Ym', $mesano_ini))->format('Y-m-d');
+            $estProduto['reduzido_ekt_ate'] = (\DateTime::createFromFormat('Ym', $mesano_fim))->format('Y-m-d');
 
-            $this->dbbonerp->update('est_produto', $produtoBonERP, array(
-                'id' => $produtoBonERP['id']
-            )) or $this->exit_db_error("Erro ao atualizar 'reduzido_ekt_desde'");
+            $this->dbbonerp->update('est_produto', $estProduto, array(
+                'id' => $estProduto['id']
+            )) or $this->exit_db_error("Erro ao atualizar 'reduzido_ekt_desde' e 'reduzido_ekt_ate'");
 
         }
         $this->logger->info('OK');
