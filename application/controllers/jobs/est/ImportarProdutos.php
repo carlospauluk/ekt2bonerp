@@ -639,7 +639,7 @@ class ImportarProdutos extends CI_Controller
             )) or $this->exit_db_error("Erro ao atualizar 'reduzido_ekt_desde' e 'reduzido_ekt_ate'");
 
 
-            $this->logger->info($mesano . ' ... ' . str_pad($estProduto['reduzido_ekt'], 6, 0, STR_PAD_LEFT) . ' ....................................................................... ' . str_pad($i++, 6, '0', STR_PAD_LEFT) . "/" . str_pad($total, 6, '0', STR_PAD_LEFT));
+            $this->logger->info(' ... ' . str_pad($estProduto['reduzido_ekt'], 6, 0, STR_PAD_LEFT) . ' ....................................................................... ' . str_pad($i++, 6, '0', STR_PAD_LEFT) . "/" . str_pad($total, 6, '0', STR_PAD_LEFT));
 
         }
         $mesano_atual = $this->agora->format('Ym');
