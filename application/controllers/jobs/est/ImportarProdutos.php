@@ -168,8 +168,12 @@ class ImportarProdutos extends CI_Controller
             $this->importarProdutosLojaVirtual();
         }
         if ($acao == 'DEATE') {
-            $this->corrigirProdutosReduzidoEktDesdeAte();
-            $this->corrigirCampoAtual();
+            $this->corrigirProdutosReduzidoEktDesdeAte(); // apaga tudo da est_produto_reduzidoektmesano
+            $this->corrigeReduzidoEktDesdeAte(); // corrige os reduzido_ekt_desde e reduzido_ekt_ate
+            $this->corrigirCampoAtual(); // acerta o campo est_produto.atual
+        }
+        if ($acao == 'DESDES_ATES') {
+            $this->corrigeReduzidoEktDesdeAte(); // corrige apenas os campos reduzido_ekt_desde e reduzido_ekt_ate
         }
         if ($acao == 'PRECOS') {
             $this->corrigirPrecos();
@@ -572,7 +576,6 @@ class ImportarProdutos extends CI_Controller
         $corrigiu_algo_aqui = false;
         $produtoId = $produtoBonERP['id'];
         $reduzido_ekt = $produtoBonERP['reduzido_ekt'];
-        $this->logger->debug("LIDANDO COM 'depara' [" . $produtoId . "]......................................................................... " . $this->mesano);
 
         // Verifica se já tem registro marcando este produto no mesano
         $sql = "SELECT * FROM est_produto_reduzidoektmesano WHERE produto_id = ? AND mesano = ? AND reduzido_ekt = ?";
@@ -611,22 +614,21 @@ class ImportarProdutos extends CI_Controller
 
         foreach ($rs as $estProduto) {
             $sql = "SELECT * FROM est_produto_reduzidoektmesano WHERE produto_id = ? ORDER BY mesano";
-            $reduzidosEktMesano = $this->dbbonerp->query($sql, [$estProduto['id']])->result_array();
-            if (!$reduzidosEktMesano or count($reduzidosEktMesano) < 1) {
+            $r = $this->dbbonerp->query($sql, [$estProduto['id']])->result_array();
+            if (!$r or count($r) < 1) {
                 throw new \Exception("Nenhum registro encontrado na est_produto_reduzidoektmesano para produto_id = '" . $estProduto['id'] . "'");
             }
 
-            foreach ($reduzidosEktMesano as $r) {
-                $mesano_ini = $r[0];
-                $mesano_fim = $r[count($r) - 1];
+            $mesano_ini = $r[0];
+            $mesano_fim = $r[count($r) - 1];
 
-                $produtoBonERP['reduzido_ekt_desde'] = (\DateTime::createFromFormat('Ym', $mesano_ini))->format('Y-m-d');
-                $produtoBonERP['reduzido_ekt_ate'] = (\DateTime::createFromFormat('Ym', $mesano_fim))->format('Y-m-d');
+            $produtoBonERP['reduzido_ekt_desde'] = (\DateTime::createFromFormat('Ym', $mesano_ini))->format('Y-m-d');
+            $produtoBonERP['reduzido_ekt_ate'] = (\DateTime::createFromFormat('Ym', $mesano_fim))->format('Y-m-d');
 
-                $this->dbbonerp->update('est_produto', $produtoBonERP, array(
-                    'id' => $produtoBonERP['id']
-                )) or $this->exit_db_error("Erro ao atualizar 'reduzido_ekt_desde'");
-            }
+            $this->dbbonerp->update('est_produto', $produtoBonERP, array(
+                'id' => $produtoBonERP['id']
+            )) or $this->exit_db_error("Erro ao atualizar 'reduzido_ekt_desde'");
+
         }
         $this->logger->info('OK');
     }
@@ -1117,8 +1119,6 @@ class ImportarProdutos extends CI_Controller
     /**
      * TRUNCATE na est_produto_reduzidoektmesano e NULL para reduzido_ekt_desde e reduzido_ekt_ate.
      * Percorre todos desde 201401 e vai inserindo na est_produto_reduzidoektmesano.
-     * Ao final, chama a corrigeReduzidoEktDesdeAte().
-     * e os valores de est_produto.reduzido_ekt_desde e reduzido_ekt_ate.
      */
     private function corrigirProdutosReduzidoEktDesdeAte()
     {
@@ -1167,7 +1167,7 @@ class ImportarProdutos extends CI_Controller
                         throw new Exception("Erro. Qtde deveria ser exatamente 1 para reduzido = '" . $r['REDUZIDO'] . "' e descricao = '" . $r['DESCRICAO'] . "'. QTDE='" . $qtde . "'");
                     }
                     $this->insereNaReduzidoEktMesano($result[0]);
-                    $this->logger->info($mesano . ' .......................................................................... ' . str_pad($i++, 6, '0', STR_PAD_LEFT) . "/" . str_pad($total, 6, '0', STR_PAD_LEFT) . " (" . $r['id'] . ")");
+                    $this->logger->info($mesano . ' ... ' . str_pad($r['REDUZIDO'], 6, 0, STR_PAD_LEFT) . ' ....................................................................... ' . str_pad($i++, 6, '0', STR_PAD_LEFT) . "/" . str_pad($total, 6, '0', STR_PAD_LEFT) . " (" . $r['id'] . ")");
                 } catch (Exception $e) {
                     print_r($e->getMessage());
                     exit();
@@ -1175,10 +1175,7 @@ class ImportarProdutos extends CI_Controller
             }
         }
 
-        $this->corrigeReduzidoEktDesdeAte();
-
         $this->logger->info("Finalizando... commitando a transação...");
-
         $this->dbbonerp->trans_complete();
     }
 }
