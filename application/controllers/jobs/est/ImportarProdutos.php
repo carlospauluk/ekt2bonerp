@@ -619,8 +619,8 @@ class ImportarProdutos extends CI_Controller
                 throw new \Exception("Nenhum registro encontrado na est_produto_reduzidoektmesano para produto_id = '" . $estProduto['id'] . "'");
             }
 
-            $mesano_ini = $r[0];
-            $mesano_fim = $r[count($r) - 1];
+            $mesano_ini = $r[0]['mesano'];
+            $mesano_fim = $r[count($r) - 1]['mesano'];
 
             $produtoBonERP['reduzido_ekt_desde'] = (\DateTime::createFromFormat('Ym', $mesano_ini))->format('Y-m-d');
             $produtoBonERP['reduzido_ekt_ate'] = (\DateTime::createFromFormat('Ym', $mesano_fim))->format('Y-m-d');
