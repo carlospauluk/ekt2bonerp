@@ -887,6 +887,7 @@ class ImportarProdutos extends CI_Controller
             'produto_id' => $produtoId,
             'dt_custo' => $produtoEkt['DATA_PCUSTO'],
             'preco_custo' => $produtoEkt['PCUSTO'],
+            'preco_vista' => $produtoEkt['PVISTA'],
             'preco_prazo' => $produtoEkt['PPRAZO']
         ));
         $existe = $query->result_array();
