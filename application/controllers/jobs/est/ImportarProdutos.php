@@ -415,33 +415,9 @@ class ImportarProdutos extends CI_Controller
         $produto['id'] = $produto_id;
         $this->logger->debug(" ________________________ OK. id do produto [" . $produto_id . "]");
 
-        // Se é uma atualização de produto, verifica se o preço foi alterado
-        if ($produto['id']) {
 
-            $this->logger->debug("Verificando se já tem o preço cadastrado na est_produto_preco...");
-
-            $params = array();
-            $params[] = $produto_id;
-            $params[] = $ektProduto['DATA_PCUSTO'];
-            $params[] = $ektProduto['PCUSTO'];
-            $params[] = $ektProduto['PPRAZO'];
-
-            $sql = "SELECT 1 FROM est_produto_preco WHERE 
-                        produto_id = ? AND 
-                        dt_custo = ? AND 
-                        preco_custo = ? AND 
-                        preco_prazo = ?";
-
-            $mesmo = $this->dbbonerp->query($sql, $params)->result_array();
-
-            if (!$mesmo) {
-                $this->logger->debug("Não tem... salvando o preço...");
-                $this->salvarProdutoPreco($ektProduto, $produto_id, $this->mesano);
-            }
-        } else {
-            $this->logger->debug("Inserindo o preço...");
-            $this->salvarProdutoPreco($ektProduto, $produto_id, $this->mesano);
-        }
+        $this->logger->debug("Salvando o preço...");
+        $this->salvarProdutoPreco($ektProduto, $produto_id, $this->mesano);
         $this->logger->debug("OK!!!");
 
         return $produto;
@@ -1188,8 +1164,8 @@ class ImportarProdutos extends CI_Controller
         $i = 1;
 
         $ultimoDiaMesAnterior = new \DateTime();
-        $ultimoDiaMesAnterior->setTime(0,0,0,0);
-        $ultimoDiaMesAnterior->setDate($ultimoDiaMesAnterior->format('Y'), $ultimoDiaMesAnterior->format('m') -1, 15)->format('Y-m-t');
+        $ultimoDiaMesAnterior->setTime(0, 0, 0, 0);
+        $ultimoDiaMesAnterior->setDate($ultimoDiaMesAnterior->format('Y'), $ultimoDiaMesAnterior->format('m') - 1, 15)->format('Y-m-t');
         $ultimoDiaMesAnterior = $ultimoDiaMesAnterior->format('Y-m-d');
 
         foreach ($result as $r) {
@@ -1216,7 +1192,8 @@ class ImportarProdutos extends CI_Controller
     /**
      * Realiza conferências
      */
-    private function conferencias() {
+    private function conferencias()
+    {
         $this->logger->info("");
         $this->logger->info("");
         $this->logger->info("");
@@ -1228,10 +1205,10 @@ class ImportarProdutos extends CI_Controller
         $this->logger->info("");
 
         $r = $this->dbbonerp->query("SELECT count(*) as qtde FROM est_produto WHERE reduzido_ekt != '88888' AND trim(descricao) != '' AND reduzido_ekt_desde IS NULL")->result_array();
-        $this->logger->info("Qtde est_produto.reduzido_ekt_desde = NULL : '" . ( ($r and isset($r['qtde'])) ? $r['qtde'] : '0') . "'");
+        $this->logger->info("Qtde est_produto.reduzido_ekt_desde = NULL : '" . (($r and isset($r['qtde'])) ? $r['qtde'] : '0') . "'");
 
         $r = $this->dbbonerp->query("SELECT reduzido_ekt, count(*) as qtde FROM est_produto WHERE reduzido_ekt != '88888' AND trim(descricao) != '' AND reduzido_ekt_ate IS NULL GROUP BY reduzido_ekt HAVING qtde > 1")->result_array();
-        $this->logger->info("Duplicação de reduzido_ekt_ate = NULL      : '" . ( ($r and isset($r['qtde'])) ? $r['qtde'] : '0') . "'");
+        $this->logger->info("Duplicação de reduzido_ekt_ate = NULL      : '" . (($r and isset($r['qtde'])) ? $r['qtde'] : '0') . "'");
 
         $this->logger->info("");
         $this->logger->info("**********************************************************");
