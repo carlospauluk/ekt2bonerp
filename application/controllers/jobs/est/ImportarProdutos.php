@@ -741,6 +741,7 @@ class ImportarProdutos extends CI_Controller
         $query = $this->dbbonerp->get_where('est_produto_preco', array(
             'produto_id' => $produtoId,
             'dt_custo' => $produtoEkt['DATA_PCUSTO'],
+            'dt_preco_venda' => $produtoEkt['DATA_PVENDA'],
             'preco_custo' => $produtoEkt['PCUSTO'],
             'preco_vista' => $produtoEkt['PVISTA'],
             'preco_prazo' => $produtoEkt['PPRAZO']
