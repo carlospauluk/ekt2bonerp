@@ -160,10 +160,10 @@ class ImportarProdutos extends CI_Controller
             }
             $this->corrigirCampoAtual();
         }
-        if ($acao == 'LOJA_VIRTUAL') {
-            $this->dtMesano->setTime(0, 0, 0, 0);
-            $this->importarProdutosLojaVirtual();
-        }
+//        if ($acao == 'LOJA_VIRTUAL') {
+//            $this->dtMesano->setTime(0, 0, 0, 0);
+//            $this->importarProdutosLojaVirtual();
+//        }
         if ($acao == 'DEATE') {
             $this->corrigirProdutosReduzidoEktDesdeAte(); // apaga tudo da est_produto_reduzidoektmesano
             $this->corrigeReduzidoEktDesdeAte(); // corrige os reduzido_ekt_desde e reduzido_ekt_ate
@@ -219,36 +219,36 @@ class ImportarProdutos extends CI_Controller
     }
 
 
-    /**
-     * Só atualiza os produtos que estão na loja virtual (ou seja, com registro na est_produto_oc_product).
-     */
-    private function importarProdutosLojaVirtual()
-    {
-        $this->logger->info("Iniciando a importação de produtos da loja virtual...");
-        $this->dbbonerp->trans_start();
-
-        $l = $this->produto_model->findProdutosLojaVirtual();
-
-        $total = count($l);
-        $this->logger->info(" >>>>>>>>>>>>>>>>>>>> " . $total . " produto(s) encontrado(s).");
-
-        $i = 0;
-        foreach ($l as $estProduto) {
-            $this->deletarSaldos($estProduto['id']);
-            $ektProduto = $this->ektproduto_model->findByMesanoAndReduzido($this->mesano, $estProduto['reduzido_ekt']);
-            if (!$ektProduto) {
-                $this->logger->info('ektproduto não encontrado para mesano = "' . $this->mesano . '" e reduzido_ekt = "' . $estProduto['reduzido_ekt'] . '"');
-                return;
-            }
-            $ektProduto = $ektProduto[0];
-            $this->logger->info(">>> " . $ektProduto['REDUZIDO'] . " - [" . $ektProduto['DESCRICAO'] . "] ................... " . str_pad(++$i, 6, '0', STR_PAD_LEFT) . "/" . str_pad($total, 6, '0', STR_PAD_LEFT));
-            $this->importarProduto($ektProduto);
-        }
-
-        $this->logger->info("Finalizando... commitando a transação...");
-        $this->dbbonerp->trans_complete();
-        $this->logger->info("OK!!!");
-    }
+//    /**
+//     * Só atualiza os produtos que estão na loja virtual (ou seja, com registro na est_produto_oc_product).
+//     */
+//    private function importarProdutosLojaVirtual()
+//    {
+//        $this->logger->info("Iniciando a importação de produtos da loja virtual...");
+//        $this->dbbonerp->trans_start();
+//
+//        $l = $this->produto_model->findProdutosLojaVirtual();
+//
+//        $total = count($l);
+//        $this->logger->info(" >>>>>>>>>>>>>>>>>>>> " . $total . " produto(s) encontrado(s).");
+//
+//        $i = 0;
+//        foreach ($l as $estProduto) {
+//            $this->deletarSaldos($estProduto['id']);
+//            $ektProduto = $this->ektproduto_model->findByMesanoAndReduzido($this->mesano, $estProduto['reduzido_ekt']);
+//            if (!$ektProduto) {
+//                $this->logger->info('ektproduto não encontrado para mesano = "' . $this->mesano . '" e reduzido_ekt = "' . $estProduto['reduzido_ekt'] . '"');
+//                return;
+//            }
+//            $ektProduto = $ektProduto[0];
+//            $this->logger->info(">>> " . $ektProduto['REDUZIDO'] . " - [" . $ektProduto['DESCRICAO'] . "] ................... " . str_pad(++$i, 6, '0', STR_PAD_LEFT) . "/" . str_pad($total, 6, '0', STR_PAD_LEFT));
+//            $this->importarProduto($ektProduto);
+//        }
+//
+//        $this->logger->info("Finalizando... commitando a transação...");
+//        $this->dbbonerp->trans_complete();
+//        $this->logger->info("OK!!!");
+//    }
 
     /**
      * Verifica se é um novo produto
@@ -561,6 +561,9 @@ class ImportarProdutos extends CI_Controller
     private function deletarSaldos($estProdutoId = null)
     {
         $sql = "DELETE FROM est_produto_reduzidoektmesano WHERE mesano = ?";
+        if ($estProdutoId) {
+            $sql .= ' AND produto_id = ' . $estProdutoId;
+        }
         $this->dbbonerp->query($sql, [$this->mesano]);
 
         $sql = 'TRUNCATE TABLE est_produto_saldo';
