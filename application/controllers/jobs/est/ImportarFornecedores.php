@@ -189,8 +189,7 @@ class ImportarFornecedores extends CI_Controller
         $pessoa['documento'] = $cnpj;
         $pessoa['nome'] = $razaoSocial;
         $pessoa['nome_fantasia'] = $nomeFantasia;
-        $pessoa['tipo_pessoa'] = 'PESSOA_JURIDICA';
-        
+
         if ($atualizando) {
             $this->logger->debug("Atualizando bse_pessoa... " . $pessoaId);
             $this->dbbonerp->update('bse_pessoa', $pessoa, array(
@@ -234,7 +233,7 @@ class ImportarFornecedores extends CI_Controller
         $enderecoId = null;
         if ($atualizando) {
             // Pesquisa todos os endereços do fornecedor
-            $sql = "SELECT e.* FROM est_fornecedor_enderecos fe, bon_endereco e WHERE fe.bon_endereco_id = e.id AND fe.est_fornecedor_id = ?";
+            $sql = "SELECT e.* FROM bse_pessoa_endereco e, bse_pessoa p, est_fornecedor f WHERE p.id = e.pessoa_id AND f.pessoa_id = p.id AND f.id = ?";
             $params = array(
                 $fornecedorBonERP_id
             );
@@ -271,11 +270,11 @@ class ImportarFornecedores extends CI_Controller
         $endereco['cep'] = preg_replace('/[^\d]/', '', trim($fornecedorEkt['CEP']));
         $endereco['cidade'] = trim($fornecedorEkt['MUNICIPIO']);
         $endereco['estado'] = trim($fornecedorEkt['UF']);
-        $endereco['tipoEndereco'] = 'COMERCIAL';
+        $endereco['tipo_endereco'] = 'COMERCIAL';
         $endereco['updated'] = date("Y-m-d H:i:s");
         
         if ($enderecoId) {
-            $this->dbbonerp->update('bon_endereco', $endereco, array(
+            $this->dbbonerp->update('bse_pessoa_endereco', $endereco, array(
                 'id' => $enderecoId
             )) or $this->exit_db_error();
         } else {
@@ -285,23 +284,23 @@ class ImportarFornecedores extends CI_Controller
             $endereco['user_inserted_id'] = 1;
             $endereco['user_updated_id'] = 1;
             
-            $this->dbbonerp->insert('bon_endereco', $endereco) or $this->exit_db_error();
+            $this->dbbonerp->insert('bse_pessoa_endereco', $endereco) or $this->exit_db_error();
             
             $enderecoId = $this->dbbonerp->insert_id();
         }
         
-        // many-to-many
-        $query = $this->dbbonerp->get_where("est_fornecedor_enderecos", array(
-            'est_fornecedor_id' => $fornecedorId,
-            'bon_endereco_id' => $enderecoId
-        )) or $this->exit_db_error();
-        $r = $query->result_array();
-        
-        if (count($r) == 0) {
-            $est_fornecedor_enderecos['est_fornecedor_id'] = $fornecedorId;
-            $est_fornecedor_enderecos['bon_endereco_id'] = $enderecoId;
-            $this->dbbonerp->insert('est_fornecedor_enderecos', $est_fornecedor_enderecos) or $this->exit_db_error();
-        }
+//        // many-to-many
+//        $query = $this->dbbonerp->get_where("est_fornecedor_enderecos", array(
+//            'est_fornecedor_id' => $fornecedorId,
+//            'bse_pessoa_endereco_id' => $enderecoId
+//        )) or $this->exit_db_error();
+//        $r = $query->result_array();
+//
+//        if (count($r) == 0) {
+//            $est_fornecedor_enderecos['est_fornecedor_id'] = $fornecedorId;
+//            $est_fornecedor_enderecos['bse_pessoa_endereco_id'] = $enderecoId;
+//            $this->dbbonerp->insert('est_fornecedor_enderecos', $est_fornecedor_enderecos) or $this->exit_db_error();
+//        }
     }
 
     /**
