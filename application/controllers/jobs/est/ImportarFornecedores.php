@@ -168,13 +168,13 @@ class ImportarFornecedores extends CI_Controller
         $fornecedorBonERP['representante_contato'] = $fornecedorEkt['DDD_REPRES'] . $fornecedorEkt['FONE_REPRES'];
         
         if ($atualizando) {
-            $query = $this->dbbonerp->get_where("bon_pessoa", array(
+            $query = $this->dbbonerp->get_where("bse_pessoa", array(
                 'id' => $pessoaId
             )) or $this->exit_db_error();
             $r = $query->result_array();
             
             if (! $r) {
-                throw new Exception('bon_pessoa não encontrado: ' . $fornecedorBonERP['pessoa_id']);
+                throw new Exception('bse_pessoa não encontrado: ' . $fornecedorBonERP['pessoa_id']);
             }
             $pessoa = $r[0];
         }
@@ -192,17 +192,17 @@ class ImportarFornecedores extends CI_Controller
         $pessoa['tipo_pessoa'] = 'PESSOA_JURIDICA';
         
         if ($atualizando) {
-            $this->logger->debug("Atualizando bon_pessoa... " . $pessoaId);
-            $this->dbbonerp->update('bon_pessoa', $pessoa, array(
+            $this->logger->debug("Atualizando bse_pessoa... " . $pessoaId);
+            $this->dbbonerp->update('bse_pessoa', $pessoa, array(
                 'id' => $pessoaId
             )) or $this->exit_db_error();
         } else {
-            $this->logger->debug("Inserindo bon_pessoa...");
+            $this->logger->debug("Inserindo bse_pessoa...");
             $pessoa['inserted'] = date("Y-m-d H:i:s");
             $pessoa['estabelecimento_id'] = 1;
             $pessoa['user_inserted_id'] = 1;
             $pessoa['user_updated_id'] = 1;
-            $this->dbbonerp->insert('bon_pessoa', $pessoa) or $this->exit_db_error();
+            $this->dbbonerp->insert('bse_pessoa', $pessoa) or $this->exit_db_error();
             $pessoaId = $this->dbbonerp->insert_id();
         }
         

@@ -86,7 +86,7 @@ class ImportarVendas extends CI_Controller
         $this->ektvenda_model = new \CIBases\Models\DAO\Base\Base_model('ekt_venda', 'ekt');
         $this->ektvenda_model->setDb($this->dbekt);
         
-        $this->pessoa_model = new \CIBases\Models\DAO\Base\Base_model('bon_pessoa', 'bonerp');
+        $this->pessoa_model = new \CIBases\Models\DAO\Base\Base_model('bse_pessoa', 'bonerp');
         $this->pessoa_model->setDb($this->dbbonerp);
         
         $this->funcionario_model = new \CIBases\Models\DAO\Base\Base_model('rh_funcionario', 'bonerp');
