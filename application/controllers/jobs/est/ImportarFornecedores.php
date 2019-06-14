@@ -250,7 +250,7 @@ class ImportarFornecedores extends CI_Controller
             }
         }
         
-        $this->salvarEndereco($fornecedorEkt, $fornecedorBonERP_id, $enderecoId);
+        $this->salvarEndereco($fornecedorEkt, $pessoaId, $enderecoId);
     }
 
     /**
@@ -262,8 +262,9 @@ class ImportarFornecedores extends CI_Controller
      * @param
      *            $enderecoId
      */
-    private function salvarEndereco($fornecedorEkt, $fornecedorId, $enderecoId = null)
+    private function salvarEndereco($fornecedorEkt, $pessoaId, $enderecoId = null)
     {
+        $endereco['pessoa_id'] = $pessoaId;
         $endereco['logradouro'] = trim($fornecedorEkt['ENDERECO']);
         $endereco['numero'] = 0;
         $endereco['bairro'] = trim($fornecedorEkt['BAIRRO']);
@@ -288,19 +289,8 @@ class ImportarFornecedores extends CI_Controller
             
             $enderecoId = $this->dbbonerp->insert_id();
         }
-        
-//        // many-to-many
-//        $query = $this->dbbonerp->get_where("est_fornecedor_enderecos", array(
-//            'est_fornecedor_id' => $fornecedorId,
-//            'bse_pessoa_endereco_id' => $enderecoId
-//        )) or $this->exit_db_error();
-//        $r = $query->result_array();
-//
-//        if (count($r) == 0) {
-//            $est_fornecedor_enderecos['est_fornecedor_id'] = $fornecedorId;
-//            $est_fornecedor_enderecos['bse_pessoa_endereco_id'] = $enderecoId;
-//            $this->dbbonerp->insert('est_fornecedor_enderecos', $est_fornecedor_enderecos) or $this->exit_db_error();
-//        }
+
+
     }
 
     /**
