@@ -3,7 +3,7 @@ require_once('./application/libraries/file/LogWriter.php');
 require_once('./application/libraries/util/Datetime_utils.php');
 
 /**
- * Classe responsável por importar produtos das tabelas espelho (ekt_*) para o bonerp.
+ * Classe responsável por importar produtos das tabelas espelho (ekt_*) para o crosier.
  *
  * Para rodar:
  *
@@ -12,12 +12,12 @@ require_once('./application/libraries/util/Datetime_utils.php');
  * (debug? export/set XDEBUG_CONFIG="idekey=session_name")
  *
  * set EKT_CSVS_PATH=\\10.1.1.100\export
- * set EKT_LOG_PATH=C:\ekt2bonerp\log\
+ * set EKT_LOG_PATH=C:\ekt2crosier\log\
  * set XDEBUG_CONFIG="idekey=session_name"
  *
  * LINUX:
  * export EKT_CSVS_PATH=/mnt/10.1.1.100-export/
- * export EKT_LOG_PATH=/home/dev/github/ekt2bonerp/log/
+ * export EKT_LOG_PATH=/home/dev/github/ekt2crosier/log/
  * export XDEBUG_CONFIG="idekey=session_name"
  *
  * IMPORTAR PRODUTOS:
@@ -79,9 +79,13 @@ class ImportarProdutos extends CI_Controller
     private $dbekt;
 
     /**
-     * Conexão ao db bonerp.
+     * Conexão ao db crosier.
      */
-    private $dbbonerp;
+    private $dbcrosier;
+    private $deptos;
+    private $subdeptos;
+    private $unidades;
+    private $grades;
 
     public function __construct()
     {
@@ -90,7 +94,7 @@ class ImportarProdutos extends CI_Controller
         ini_set('memory_limit', '2048M');
 
         $this->dbekt = $this->load->database('ekt', TRUE);
-        $this->dbbonerp = $this->load->database('bonerp', TRUE);
+        $this->dbcrosier = $this->load->database('crosier', TRUE);
 
         $this->load->library('datetime_library');
         error_reporting(E_ALL);
@@ -99,19 +103,19 @@ class ImportarProdutos extends CI_Controller
         $this->agora = new DateTime();
 
         $this->load->model('est/produto_model');
-        $this->produto_model->setDb($this->dbbonerp);
+        $this->produto_model->setDb($this->dbcrosier);
 
-        $this->preco_model = new \CIBases\Models\DAO\Base\Base_model('est_produto_preco', 'bonerp');
-        $this->preco_model->setDb($this->dbbonerp);
+        $this->preco_model = new \CIBases\Models\DAO\Base\Base_model('est_produto_preco', 'crosier');
+        $this->preco_model->setDb($this->dbcrosier);
 
         $this->load->model('est/fornecedor_model');
-        $this->fornecedor_model->setDb($this->dbbonerp);
+        $this->fornecedor_model->setDb($this->dbcrosier);
 
         $this->load->model('ekt/ektproduto_model');
         $this->ektproduto_model->setDb($this->dbekt);
 
-        $this->produtosaldo_model = new \CIBases\Models\DAO\Base\Base_model('est_produto_saldo', 'bonerp');
-        $this->produtosaldo_model->setDb($this->dbbonerp);
+        $this->produtosaldo_model = new \CIBases\Models\DAO\Base\Base_model('est_produto_saldo', 'crosier');
+        $this->produtosaldo_model->setDb($this->dbcrosier);
     }
 
     /**
@@ -122,33 +126,33 @@ class ImportarProdutos extends CI_Controller
      *            DEATE)
      * @throws Exception
      */
-    public function importar($acao, $mesano = null)
+    public function importar($acao, $mesano = null): void
     {
         $time_start = microtime(true);
 
-        $this->csvsPath = getenv('EKT_CSVS_PATH') or die("EKT_CSVS_PATH não informado");
+        $this->csvsPath = getenv('EKT_CSVS_PATH') or die('EKT_CSVS_PATH não informado');
 
-        $logPath = getenv('EKT_LOG_PATH') or die("EKT_LOG_PATH não informado");
-        $prefix = "ImportarProdutos" . '_' . $mesano . '_' . $acao . "_";
+        $logPath = getenv('EKT_LOG_PATH') or die('EKT_LOG_PATH não informado');
+        $prefix = 'ImportarProdutos' . '_' . $mesano . '_' . $acao . '_';
         $this->logger = new LogWriter($logPath, $prefix);
 
-        $this->logger->info("csvsPath: [" . $this->csvsPath . "]");
-        $this->logger->info("logPath: [" . $logPath . "]");
+        $this->logger->info('csvsPath: [' . $this->csvsPath . ']');
+        $this->logger->info('logPath: [' . $logPath . ']');
 
         $mesano = $mesano ? $mesano : (new DateTime())->format('Ym');
         $this->mesano = $mesano;
-        $this->dtMesano = DateTime::createFromFormat('Ymd', $mesano . "01");
+        $this->dtMesano = DateTime::createFromFormat('Ymd', $mesano . '01');
         if ($this->dtMesano && !$this->dtMesano instanceof DateTime) {
-            $this->logger->info("mesano inválido.");
+            $this->logger->info('mesano inválido.');
             $this->logger->sendMail();
             $this->logger->closeLog();
             exit();
         }
 
-        $this->importandoMesCorrente = $this->mesano == $this->agora->format('Ym');
+        $this->importandoMesCorrente = $this->mesano === $this->agora->format('Ym');
         $this->logger->info("Importando 'atual'? " . ($this->importandoMesCorrente ? 'SIM' : 'NÃO'));
 
-        if ($acao == 'PROD') {
+        if ($acao === 'PROD') {
             $this->dtMesano->setTime(0, 0, 0, 0);
             $this->deletarSaldos();
             $this->importarProdutos();
@@ -160,19 +164,15 @@ class ImportarProdutos extends CI_Controller
             }
             $this->corrigirCampoAtual();
         }
-//        if ($acao == 'LOJA_VIRTUAL') {
-//            $this->dtMesano->setTime(0, 0, 0, 0);
-//            $this->importarProdutosLojaVirtual();
-//        }
-        if ($acao == 'DEATE') {
+        if ($acao === 'DEATE') {
             $this->corrigirProdutosReduzidoEktDesdeAte(); // apaga tudo da est_produto_reduzidoektmesano
             $this->corrigeReduzidoEktDesdeAte(); // corrige os reduzido_ekt_desde e reduzido_ekt_ate
             $this->corrigirCampoAtual(); // acerta o campo est_produto.atual
         }
-        if ($acao == 'DESDES_ATES') {
+        if ($acao === 'DESDES_ATES') {
             $this->corrigeReduzidoEktDesdeAte(); // corrige apenas os campos reduzido_ekt_desde e reduzido_ekt_ate
         }
-        if ($acao == 'PRECOS') {
+        if ($acao === 'PRECOS') {
             $this->corrigirPrecos();
         }
 
@@ -181,81 +181,74 @@ class ImportarProdutos extends CI_Controller
         $time_end = microtime(true);
         $execution_time = ($time_end - $time_start);
         $this->logger->info(PHP_EOL);
-        $this->logger->info("----------------------------------");
-        $this->logger->info("Tempo total: " . $execution_time . "s");
+        $this->logger->info('----------------------------------');
+        $this->logger->info('Tempo total: ' . $execution_time . 's');
         $this->logger->sendMail();
         $this->logger->closeLog();
+    }
+
+    private function deletarSaldos($estProdutoId = null): void
+    {
+        $sql = 'DELETE FROM est_produto_reduzidoektmesano WHERE mesano = ?';
+        if ($estProdutoId) {
+            $sql .= ' AND produto_id = ' . $estProdutoId;
+        }
+        $this->dbcrosier->query($sql, [$this->mesano]);
+
+        $sql = 'TRUNCATE TABLE est_produto_saldo';
+        if ($estProdutoId) {
+            $sql = 'DELETE FROM est_produto_saldo WHERE produto_id = ' . $estProdutoId;
+        }
+        $this->dbcrosier->query($sql) or $this->exit_db_error("Erro ao $sql");
+    }
+
+    private function exit_db_error($msg = null): void
+    {
+        $this->logger->info(str_pad('', 100, '*'));
+        $this->logger->info($msg ? $msg : '');
+        $this->logger->info('LAST QUERY: ' . $this->dbcrosier->last_query());
+        print_r($this->dbcrosier->error());
+        $this->logger->info(str_pad('', 100, '*'));
+        exit();
     }
 
     /**
      * Percorre todos os registros da ekt_produto para o $this->mesano.
      */
-    private function importarProdutos()
+    private function importarProdutos(): void
     {
-        $this->logger->info("Iniciando a importação de produtos...");
-        $this->dbbonerp->trans_start();
+        $this->logger->info('Iniciando a importação de produtos...');
+        $this->dbcrosier->trans_start();
 
         $l = $this->ektproduto_model->findByMesano($this->mesano);
         // $l = $this->dbekt->query("SELECT * FROM ekt_produto WHERE reduzido = 1507 AND mesano = ?", array($this->mesano))->result_array();
 
         $total = count($l);
-        $this->logger->info(" >>>>>>>>>>>>>>>>>>>> " . $total . " produto(s) encontrado(s).");
+        $this->logger->info(' >>>>>>>>>>>>>>>>>>>> ' . $total . ' produto(s) encontrado(s).');
 
         $i = 0;
         foreach ($l as $ektProduto) {
-            if ($ektProduto['REDUZIDO'] == 88888) {
+            if ($ektProduto['REDUZIDO'] === 88888) {
                 continue;
             }
-            if (trim($ektProduto['DESCRICAO']) == '') {
-                $this->logger->info(" >>>>>>>>>>>>>>>>>>>> PRODUTO com reduzido = '" . $ektProduto['REDUZIDO'] . " está sem descrição. PULANDO.");
+            if (trim($ektProduto['DESCRICAO']) === '') {
+                $this->logger->info(" >>>>>>>>>>>>>>>>>>>> PRODUTO com reduzido = '" . $ektProduto['REDUZIDO'] . ' está sem descrição. PULANDO.');
                 continue;
             }
-            $this->logger->info(">>> " . str_pad($ektProduto['REDUZIDO'], 6, '0', STR_PAD_LEFT) . " - [" . $ektProduto['DESCRICAO'] . "] ................... " . str_pad(++$i, 6, '0', STR_PAD_LEFT) . "/" . str_pad($total, 6, '0', STR_PAD_LEFT));
+            $this->logger->info('>>> ' . str_pad($ektProduto['REDUZIDO'], 6, '0', STR_PAD_LEFT) . ' - [' . $ektProduto['DESCRICAO'] . '] ................... ' . str_pad(++$i, 6, '0', STR_PAD_LEFT) . '/' . str_pad($total, 6, '0', STR_PAD_LEFT));
             $this->importarProduto($ektProduto);
         }
-        $this->logger->info("Finalizando... commitando a transação...");
-        $this->dbbonerp->trans_complete();
-        $this->logger->info("OK!!!");
+        $this->logger->info('Finalizando... commitando a transação...');
+        $this->dbcrosier->trans_complete();
+        $this->logger->info('OK!!!');
     }
-
-
-//    /**
-//     * Só atualiza os produtos que estão na loja virtual (ou seja, com registro na est_produto_oc_product).
-//     */
-//    private function importarProdutosLojaVirtual()
-//    {
-//        $this->logger->info("Iniciando a importação de produtos da loja virtual...");
-//        $this->dbbonerp->trans_start();
-//
-//        $l = $this->produto_model->findProdutosLojaVirtual();
-//
-//        $total = count($l);
-//        $this->logger->info(" >>>>>>>>>>>>>>>>>>>> " . $total . " produto(s) encontrado(s).");
-//
-//        $i = 0;
-//        foreach ($l as $estProduto) {
-//            $this->deletarSaldos($estProduto['id']);
-//            $ektProduto = $this->ektproduto_model->findByMesanoAndReduzido($this->mesano, $estProduto['reduzido_ekt']);
-//            if (!$ektProduto) {
-//                $this->logger->info('ektproduto não encontrado para mesano = "' . $this->mesano . '" e reduzido_ekt = "' . $estProduto['reduzido_ekt'] . '"');
-//                return;
-//            }
-//            $ektProduto = $ektProduto[0];
-//            $this->logger->info(">>> " . $ektProduto['REDUZIDO'] . " - [" . $ektProduto['DESCRICAO'] . "] ................... " . str_pad(++$i, 6, '0', STR_PAD_LEFT) . "/" . str_pad($total, 6, '0', STR_PAD_LEFT));
-//            $this->importarProduto($ektProduto);
-//        }
-//
-//        $this->logger->info("Finalizando... commitando a transação...");
-//        $this->dbbonerp->trans_complete();
-//        $this->logger->info("OK!!!");
-//    }
 
     /**
      * Verifica se é um novo produto
      * @param $ektProduto
      * @throws Exception
      */
-    private function importarProduto($ektProduto)
+    private function importarProduto($ektProduto): void
     {
         // Verifica produtos com mesmo reduzidoEKT
         $produtosComMesmoReduzidoEKT = $this->produto_model->findByReduzidoEkt($ektProduto['REDUZIDO'], null);
@@ -263,8 +256,8 @@ class ImportarProdutos extends CI_Controller
         $qtdeComMesmoReduzido = count($produtosComMesmoReduzidoEKT);
 
         // Se não tem nenhum produto com o mesmo reduzido, só insere.
-        if ($qtdeComMesmoReduzido == 0) {
-            $this->logger->info("Produto novo. Inserindo...");
+        if ($qtdeComMesmoReduzido === 0) {
+            $this->logger->info('Produto novo. Inserindo...');
             $estProduto = $this->saveProduto($ektProduto, null);
             $this->saveGrade($ektProduto, $estProduto);
             $this->insereNaReduzidoEktMesano($estProduto);
@@ -277,7 +270,7 @@ class ImportarProdutos extends CI_Controller
                 $descricao_ekt = trim($ektProduto['DESCRICAO']);
                 $descricao = trim($mesmoReduzido['descricao']);
 
-                if ($descricao_ekt == $descricao) {
+                if ($descricao_ekt === $descricao) {
                     // PRODUTO JÁ EXISTENTE
                     $achouMesmo = true;
                     $this->saveProduto($ektProduto, $mesmoReduzido);
@@ -288,8 +281,8 @@ class ImportarProdutos extends CI_Controller
                     // conferindo se as qtdes na grade batem
                     $qtdeTotal_ektProduto = $this->getQtdeTotalEktProduto($ektProduto);
                     $qtdeTotal_produto = $this->getQtdeTotalProduto($mesmoReduzido);
-                    if ($qtdeTotal_ektProduto != $qtdeTotal_produto) {
-                        $this->logger->info("Qtde diferem para produtoId=[" . $mesmoReduzido['id'] . "] Reduzido:[" . $ektProduto['REDUZIDO'] . "]");
+                    if ($qtdeTotal_ektProduto !== $qtdeTotal_produto) {
+                        $this->logger->info('Qtde diferem para produtoId=[' . $mesmoReduzido['id'] . '] Reduzido:[' . $ektProduto['REDUZIDO'] . ']');
                         return;
                     }
 
@@ -299,51 +292,11 @@ class ImportarProdutos extends CI_Controller
                 }
             }
             if (!$achouMesmo) {
-                $this->logger->debug("Não achou o mesmo. Salvando um novo produto...");
+                $this->logger->debug('Não achou o mesmo. Salvando um novo produto...');
                 $produto = $this->saveProduto($ektProduto, null);
                 $this->saveGrade($ektProduto, $produto);
                 $this->insereNaReduzidoEktMesano($produto);
             }
-        }
-    }
-
-    /**
-     * Monta o est_produto.reduzido
-     *
-     * @param $ektProduto
-     * @param null $produto
-     * @return string|void
-     */
-    private function handleReduzido($ektProduto, $produto = null)
-    {
-        if ($produto and array_key_exists('reduzido', $produto) and $produto['reduzido']) {
-
-            $reduzido_ekt = str_pad($ektProduto['REDUZIDO'], 5, '0', STR_PAD_LEFT);
-            $reduzid_bonerp = substr($produto['reduzido'], strlen($produto['reduzido']) - 5);
-
-            if ($reduzido_ekt != $reduzid_bonerp) {
-                $this->logger->info("Problema com reduzido... bonerp: [" . $produto['reduzido'] . "]. EKT: [" . $ektProduto['REDUZIDO'] . "]");
-                return;
-            } else {
-                return $produto['reduzido'];
-            }
-        } else {
-            // O reduzido do BonERP sempre começa com o mesano
-            $mesano_menor = substr($this->mesano, 2);
-            $reduzido = $mesano_menor . str_pad($ektProduto['REDUZIDO'], 10, '0', STR_PAD_LEFT);
-
-            while (true) {
-                $existe = $this->dbbonerp->query("SELECT 1 FROM est_produto WHERE reduzido = ?", array(
-                    $reduzido
-                ))->result_array();
-                if (count($existe) > 0) {
-                    $reduzido = $mesano_menor . "0" . str_pad(rand(1, 999), 3, '0', STR_PAD_LEFT) . "0" . str_pad($ektProduto['REDUZIDO'], 5, '0', STR_PAD_LEFT);
-                } else {
-                    break;
-                }
-            }
-
-            return $reduzido;
         }
     }
 
@@ -359,19 +312,19 @@ class ImportarProdutos extends CI_Controller
     {
         $produto['depto_imp_id'] = $this->findDeptoBycodigo($ektProduto['DEPTO']);
         if (!$produto['depto_imp_id']) {
-            throw new Exception("Depto não encontrado [" . $ektProduto['DEPTO'] . "]");
+            throw new \RuntimeException('Depto não encontrado [' . $ektProduto['DEPTO'] . ']');
         }
 
         $produto['subdepto_id'] = $this->findSubdeptoBycodigo($ektProduto['SUBDEPTO']);
         if (!$produto['subdepto_id']) {
-            throw new Exception("Subdepto não encontrado [" . $ektProduto['SUBDEPTO'] . "]");
+            throw new \RuntimeException('Subdepto não encontrado [' . $ektProduto['SUBDEPTO'] . ']');
         }
 
         $produto['subdepto_err'] = $this->findSubdeptoBycodigo($ektProduto['SUBDEPTO']);
 
         $fornecedor_id = $this->fornecedor_model->findByCodigoEkt($ektProduto['FORNEC'], $this->mesano);
         if (!$fornecedor_id) {
-            throw new Exception("Fornecedor não encontrado: [" . $ektProduto['FORNEC'] . "] no mesano [" . $this->mesano . "]");
+            throw new \RuntimeException('Fornecedor não encontrado: [' . $ektProduto['FORNEC'] . '] no mesano [' . $this->mesano . ']');
         }
         $produto['fornecedor_id'] = $fornecedor_id;
 
@@ -380,7 +333,7 @@ class ImportarProdutos extends CI_Controller
 
         $produto['grade_id'] = $this->findGradeByCodigo($ektProduto['GRADE']);
         if (!$produto['grade_id']) {
-            throw new Exception("Grade não encontrada [" . $ektProduto['GRADE'] . "]");
+            throw new \RuntimeException('Grade não encontrada [' . $ektProduto['GRADE'] . ']');
         }
 
         $produto['grade_err'] = $ektProduto['GRADE'];
@@ -391,15 +344,15 @@ class ImportarProdutos extends CI_Controller
         $produto['unidade_produto_id'] = $this->findUnidadeByLabel($ektProduto['UNIDADE']);
 
         if (!$produto['unidade_produto_id']) {
-            throw new Exception("Unidade não encontrada: [" . $ektProduto['UNIDADE'] . "]");
+            throw new \RuntimeException('Unidade não encontrada: [' . $ektProduto['UNIDADE'] . ']');
         }
         $produto['unidade_produto_err'] = $ektProduto['UNIDADE'];
 
         $produto['cst'] = 102;
         $produto['icms'] = 0;
-        $produto['tipo_tributacao'] = "T";
-        $produto['ncm'] = $ektProduto['NCM'] ? $ektProduto['NCM'] : "62179000";
-        $produto['fracionado'] = $ektProduto['FRACIONADO'] == 'S' ? true : false;
+        $produto['tipo_tributacao'] = 'T';
+        $produto['ncm'] = $ektProduto['NCM'] ? $ektProduto['NCM'] : '62179000';
+        $produto['fracionado'] = $ektProduto['FRACIONADO'] === 'S' ? true : false;
 
         $produto['atual'] = $this->importandoMesCorrente;
         $produto['na_loja_virtual'] = (isset($produto['na_loja_virtual']) and (boolval($produto['na_loja_virtual']) === true)) ? true : false;
@@ -411,27 +364,191 @@ class ImportarProdutos extends CI_Controller
         return $produto;
     }
 
+    private function findDeptoByCodigo($codigo)
+    {
+        if (!$this->deptos) {
+            $this->deptos = array();
+            $sql = 'SELECT id, codigo FROM est_depto';
+            $r = $this->dbcrosier->query($sql)->result_array();
+            foreach ($r as $depto) {
+                $this->deptos[$depto['codigo']] = $depto['id'];
+            }
+        }
+        return $this->deptos[$codigo] ? $this->deptos[$codigo] : $this->deptos['0'];
+    }
+
+    private function findSubdeptoByCodigo($codigo)
+    {
+        if (!$this->subdeptos) {
+            $this->subdeptos = array();
+            $sql = 'SELECT id, codigo FROM est_subdepto';
+            $r = $this->dbcrosier->query($sql)->result_array();
+            foreach ($r as $subdepto) {
+                $this->subdeptos[$subdepto['codigo']] = $subdepto['id'];
+            }
+        }
+        if (isset($this->subdeptos[$codigo])) {
+            return $this->subdeptos[$codigo];
+        } else {
+            return $this->subdeptos['0'];
+        }
+    }
+
+    private function findGradeByCodigo($codigo)
+    {
+        if (!$this->grades) {
+            $this->grades = array();
+            $sql = 'SELECT id, codigo FROM est_grade';
+            $r = $this->dbcrosier->query($sql)->result_array();
+            foreach ($r as $grade) {
+                $this->grades[$grade['codigo']] = $grade['id'];
+            }
+        }
+        // Se não achar, retorna o 999999 (ERRO DE IMPORTAÇÃO)
+        return $this->grades[$codigo] ? $this->grades[$codigo] : $this->grades['99'];
+    }
+
+    /**
+     * Monta o est_produto.reduzido
+     *
+     * @param $ektProduto
+     * @param null $produto
+     * @return string|void
+     */
+    private function handleReduzido($ektProduto, $produto = null)
+    {
+        if ($produto and array_key_exists('reduzido', $produto) and $produto['reduzido']) {
+
+            $reduzido_ekt = str_pad($ektProduto['REDUZIDO'], 5, '0', STR_PAD_LEFT);
+            $reduzid_crosier = substr($produto['reduzido'], strlen($produto['reduzido']) - 5);
+
+            if ($reduzido_ekt !== $reduzid_crosier) {
+                $this->logger->info('Problema com reduzido... crosier: [' . $produto['reduzido'] . ']. EKT: [' . $ektProduto['REDUZIDO'] . ']');
+                return;
+            }
+            // else
+            return $produto['reduzido'];
+
+        }
+
+        // else
+        // O reduzido do Crosier sempre começa com o mesano
+        $mesano_menor = substr($this->mesano, 2);
+        $reduzido = $mesano_menor . str_pad($ektProduto['REDUZIDO'], 10, '0', STR_PAD_LEFT);
+
+        while (true) {
+            $existe = $this->dbcrosier->query('SELECT 1 FROM est_produto WHERE reduzido = ?', array(
+                $reduzido
+            ))->result_array();
+            if (count($existe) > 0) {
+                $reduzido = $mesano_menor . '0' . str_pad(rand(1, 999), 3, '0', STR_PAD_LEFT) . '0' . str_pad($ektProduto['REDUZIDO'], 5, '0', STR_PAD_LEFT);
+            } else {
+                break;
+            }
+        }
+
+        return $reduzido;
+
+    }
+
+    private function findUnidadeByLabel($label)
+    {
+        if (!$this->unidades) {
+            $this->unidades = array();
+            $sql = 'SELECT id, label FROM est_unidade_produto';
+            $r = $this->dbcrosier->query($sql)->result_array();
+            foreach ($r as $unidade) {
+                $this->unidades[$unidade['label']] = $unidade['id'];
+            }
+        }
+        if (!$label === null or strpos($label, 'PC') >= 0) {
+            $label = 'UN';
+        }
+        // Se não achar, retorna o 999999 (ERRO DE IMPORTAÇÃO)
+        return $this->unidades[$label] ? $this->unidades[$label] : $this->unidades['ERRO'];
+    }
+
+    /**
+     * Salva o est_produto_preco.
+     *
+     * @param $produtoEkt
+     * @param $produtoId
+     * @param $mesano
+     */
+    private function salvarProdutoPreco($produtoEkt, $produtoId, $mesano): void
+    {
+        if (!$produtoEkt['DATA_PCUSTO']) {
+            $produtoEkt['DATA_PCUSTO'] = DateTime::createFromFormat('Ymd', $mesano . '01')->format('Y-m-d');
+        }
+
+        if (!$produtoEkt['DATA_PVENDA']) {
+            $produtoEkt['DATA_PVENDA'] = DateTime::createFromFormat('Ymd', $mesano . '01')->format('Y-m-d');
+        }
+
+        $query = $this->dbcrosier->get_where('est_produto_preco', array(
+            'produto_id' => $produtoId,
+            'dt_custo' => $produtoEkt['DATA_PCUSTO'],
+            'dt_preco_venda' => $produtoEkt['DATA_PVENDA'],
+            'preco_custo' => $produtoEkt['PCUSTO'],
+            'preco_vista' => $produtoEkt['PVISTA'],
+            'preco_prazo' => $produtoEkt['PPRAZO']
+        ));
+        $existe = $query->result_array();
+        if (count($existe) > 0) {
+            $this->existentes++;
+            return;
+        }
+
+        $dtMesano = DateTime::createFromFormat('Ymd', $mesano . '01')->format('Y-m-d');
+
+        $data = array(
+            'inserted' => date('Y-m-d H:i:s'),
+            'updated' => date('Y-m-d H:i:s'),
+            'version' => 0,
+            'coeficiente' => $produtoEkt['COEF'],
+            'custo_operacional' => $produtoEkt['MARGEMC'],
+            'dt_custo' => $produtoEkt['DATA_PCUSTO'],
+            'dt_preco_venda' => $produtoEkt['DATA_PVENDA'],
+            'margem' => $produtoEkt['MARGEM'],
+            'prazo' => $produtoEkt['PRAZO'],
+            'preco_custo' => $produtoEkt['PCUSTO'],
+            'preco_prazo' => $produtoEkt['PPRAZO'],
+            'preco_promo' => $produtoEkt['PPROMO'],
+            'preco_vista' => $produtoEkt['PVISTA'],
+            'estabelecimento_id' => 1,
+            'user_inserted_id' => 1,
+            'user_updated_id' => 1,
+            'produto_id' => $produtoId,
+            'custo_financeiro' => 0.15,
+            'mesano' => $dtMesano
+        );
+
+        $this->dbcrosier->insert('est_produto_preco', $data) or $this->exit_db_error();
+
+        $this->inseridos++;
+    }
+
     /**
      * Salva os registros da est_produto_saldo.
      * @param $ektProduto
      * @param $produto
      * @throws Exception
      */
-    private function saveGrade($ektProduto, $produto)
+    private function saveGrade($ektProduto, $produto): void
     {
-        $saldos = $this->dbbonerp->query("SELECT count(*) as qtde FROM est_produto_saldo WHERE produto_id = ?", array(
+        $saldos = $this->dbcrosier->query('SELECT count(*) as qtde FROM est_produto_saldo WHERE produto_id = ?', array(
             $produto['id']
         ))->result_array();
 
         if (count($saldos) > 0 && $saldos[0]['qtde'] > 0) {
-            throw new Exception("Já tem saldo [" . $produto['descricao'] . "] e não deveria por causa do truncate do começo.");
+            throw new \RuntimeException('Já tem saldo [' . $produto['descricao'] . '] e não deveria por causa do truncate do começo.');
         }
 
-        $qryQtdeTamanhos = $this->dbbonerp->query("SELECT count(*) as qtde FROM est_grade_tamanho WHERE grade_id = ?", array(
+        $qryQtdeTamanhos = $this->dbcrosier->query('SELECT count(*) as qtde FROM est_grade_tamanho WHERE grade_id = ?', array(
             $produto['grade_id']
         ))->result_array();
         if (!$qryQtdeTamanhos[0] or !$qryQtdeTamanhos[0]['qtde']) {
-            throw new Exception("Erro ao pesquisar tamanhos para a grade " . $produto['grade_id']);
+            throw new \RuntimeException('Erro ao pesquisar tamanhos para a grade ' . $produto['grade_id']);
         }
         $qtdeTamanhos = $qryQtdeTamanhos[0]['qtde'];
 
@@ -484,7 +601,7 @@ class ImportarProdutos extends CI_Controller
         }
 
         if ($acumulado > 0) {
-            $this->logger->debug("Produto com qtdes em posições fora da grade. Acumulado: [" . $acumulado . "]");
+            $this->logger->debug('Produto com qtdes em posições fora da grade. Acumulado: [' . $acumulado . ']');
         }
 
         for ($i = 1; $i <= 12; $i++) {
@@ -504,32 +621,63 @@ class ImportarProdutos extends CI_Controller
      * @param $acumulado
      * @throws Exception
      */
-    private function saveProdutoSaldo($ektProduto, $produto, $ordem, $acumulado)
+    private function saveProdutoSaldo($ektProduto, $produto, $ordem, $acumulado): void
     {
         $ordemStr = str_pad($ordem, 2, '0', STR_PAD_LEFT);
 
         $qtde = (double)$ektProduto['QT' . $ordemStr];
         $qtde += $acumulado;
 
-        $qryGt = $this->dbbonerp->query("SELECT gt.id FROM est_grade_tamanho gt, est_grade g WHERE gt.grade_id = g.id AND g.codigo = ? AND gt.ordem = ?", array(
+        $qryGt = $this->dbcrosier->query('SELECT gt.id FROM est_grade_tamanho gt, est_grade g WHERE gt.grade_id = g.id AND g.codigo = ? AND gt.ordem = ?', array(
             $ektProduto['GRADE'],
             $ordem
         ))->result_array();
 
-        if (count($qryGt) != 1) {
-            throw new Exception("Erro ao pesquisar grade. Reduzido: [" . $ektProduto['REDUZIDO'] . "]. Código: [" . $ektProduto['GRADE'] . "]. Ordem: [" . $ordem . "]");
+        if (count($qryGt) !== 1) {
+            throw new \RuntimeException('Erro ao pesquisar grade. Reduzido: [' . $ektProduto['REDUZIDO'] . ']. Código: [' . $ektProduto['GRADE'] . ']. Ordem: [' . $ordem . ']');
         }
         $gt = $qryGt[0];
 
         $produtoSaldo['produto_id'] = $produto['id'];
         $produtoSaldo['grade_tamanho_id'] = $gt['id'];
         $produtoSaldo['qtde'] = $qtde;
-        $produtoSaldo['selec'] = $ektProduto['F' . $ordem] == 'S';
+        $produtoSaldo['selec'] = $ektProduto['F' . $ordem] === 'S';
 
-        $this->produtosaldo_model->save($produtoSaldo) or $this->exit_db_error("Erro ao salvar na est_produto_saldo para o produto id [" . $produto['id'] . "]");
+        $this->produtosaldo_model->save($produtoSaldo) or $this->exit_db_error('Erro ao salvar na est_produto_saldo para o produto id [' . $produto['id'] . ']');
     }
 
+    /**
+     * Insere o registro na est_produto_reduzidoektmesano se ainda não existir para o $this->mesano.
+     *
+     * @param $produtoCrosier
+     */
+    private function insereNaReduzidoEktMesano($produtoCrosier): void
+    {
+        $produtoId = $produtoCrosier['id'];
+        $reduzido_ekt = $produtoCrosier['reduzido_ekt'];
 
+        // Verifica se já tem registro marcando este produto no mesano
+        $sql = 'SELECT * FROM est_produto_reduzidoektmesano WHERE produto_id = ? AND mesano = ? AND reduzido_ekt = ?';
+        $params = array(
+            $produtoId,
+            $this->mesano,
+            $reduzido_ekt
+        );
+        $r = $this->dbcrosier->query($sql, $params)->result_array();
+
+        // Se ainda não tem na est_produto_reduzidoektmesano, insere...
+        if (count($r) === 0) {
+            $codektmesano['produto_id'] = $produtoId;
+            $codektmesano['mesano'] = $this->mesano;
+            $codektmesano['reduzido_ekt'] = $reduzido_ekt;
+            $this->dbcrosier->insert('est_produto_reduzidoektmesano', $codektmesano) or $this->exit_db_error('Erro ao inserir na est_produto_reduzidoektmesano. produto id [' . $produtoId . ']');
+        }
+    }
+
+    /**
+     * @param $ektProduto
+     * @return float
+     */
     private function getQtdeTotalEktProduto($ektProduto)
     {
         $qtdeTotal = ($ektProduto['QT01'] ? $ektProduto['QT01'] : 0.0) + ($ektProduto['QT02'] ? $ektProduto['QT02'] : 0.0) + ($ektProduto['QT03'] ? $ektProduto['QT03'] : 0.0) + ($ektProduto['QT04'] ? $ektProduto['QT04'] : 0.0) + ($ektProduto['QT05'] ? $ektProduto['QT05'] : 0.0) + ($ektProduto['QT06'] ? $ektProduto['QT06'] : 0.0) + ($ektProduto['QT07'] ? $ektProduto['QT07'] : 0.0) + ($ektProduto['QT08'] ? $ektProduto['QT08'] : 0.0) + ($ektProduto['QT09'] ? $ektProduto['QT09'] : 0.0) + ($ektProduto['QT10'] ? $ektProduto['QT10'] : 0.0) + ($ektProduto['QT11'] ? $ektProduto['QT11'] : 0.0) + ($ektProduto['QT12'] ? $ektProduto['QT12'] : 0.0);
@@ -537,15 +685,19 @@ class ImportarProdutos extends CI_Controller
         return $qtdeTotal;
     }
 
-    private function getQtdeTotalProduto($produto)
+    /**
+     * @param $produto
+     * @return int|null
+     */
+    private function getQtdeTotalProduto($produto): ?int
     {
         if (!$produto) {
-            $this->logger->debug("PRODUTO == NULL ?????? ");
+            $this->logger->debug('PRODUTO === NULL ?????? ');
             return null;
         }
         $qtdeTotal = 0;
 
-        $saldos = $this->dbbonerp->query("SELECT qtde FROM est_produto_saldo WHERE produto_id = ?", array(
+        $saldos = $this->dbcrosier->query('SELECT qtde FROM est_produto_saldo WHERE produto_id = ?', array(
             $produto['id']
         ))->result_array();
 
@@ -558,295 +710,41 @@ class ImportarProdutos extends CI_Controller
         return $qtdeTotal;
     }
 
-    private function deletarSaldos($estProdutoId = null)
-    {
-        $sql = "DELETE FROM est_produto_reduzidoektmesano WHERE mesano = ?";
-        if ($estProdutoId) {
-            $sql .= ' AND produto_id = ' . $estProdutoId;
-        }
-        $this->dbbonerp->query($sql, [$this->mesano]);
-
-        $sql = 'TRUNCATE TABLE est_produto_saldo';
-        if ($estProdutoId) {
-            $sql = 'DELETE FROM est_produto_saldo WHERE produto_id = ' . $estProdutoId;
-        }
-        $this->dbbonerp->query($sql) or $this->exit_db_error("Erro ao $sql");
-    }
-
-
-    private function getMesAnoList($dtIni, $dtFim)
-    {
-        $dtIni = DateTime::createFromFormat('Y-m-d', $dtIni);
-        $dtFim = DateTime::createFromFormat('Y-m-d', $dtFim);
-        if ($dtFim < $dtIni) {
-            return;
-        }
-        if ($dtIni == null) {
-            throw new Exception("dtini null");
-        }
-        if ($dtFim == null) {
-            return;
-        }
-        $list = array();
-        $aux = clone $dtIni;
-        $dtFimMesano = $dtFim->format('Ym');
-        do {
-            $mesano = $aux->format('Ym');
-            $list[] = $mesano;
-            if ($mesano == $dtFimMesano)
-                break;
-            $aux->add(new \DateInterval('P1M'));
-        } while (true);
-        return $list;
-    }
-
-    private $deptos;
-
-    private function findDeptoByCodigo($codigo)
-    {
-        if (!$this->deptos) {
-            $this->deptos = array();
-            $sql = "SELECT id, codigo FROM est_depto";
-            $r = $this->dbbonerp->query($sql)->result_array();
-            foreach ($r as $depto) {
-                $this->deptos[$depto['codigo']] = $depto['id'];
-            }
-        }
-        return $this->deptos[$codigo] ? $this->deptos[$codigo] : $this->deptos['0'];
-    }
-
-    private $subdeptos;
-
-    private function findSubdeptoByCodigo($codigo)
-    {
-        if (!$this->subdeptos) {
-            $this->subdeptos = array();
-            $sql = "SELECT id, codigo FROM est_subdepto";
-            $r = $this->dbbonerp->query($sql)->result_array();
-            foreach ($r as $subdepto) {
-                $this->subdeptos[$subdepto['codigo']] = $subdepto['id'];
-            }
-        }
-        if (isset($this->subdeptos[$codigo])) {
-            return $this->subdeptos[$codigo];
-        } else {
-            return $this->subdeptos['0'];
-        }
-    }
-
-    private $unidades;
-
-    private function findUnidadeByLabel($label)
-    {
-        if (!$this->unidades) {
-            $this->unidades = array();
-            $sql = "SELECT id, label FROM est_unidade_produto";
-            $r = $this->dbbonerp->query($sql)->result_array();
-            foreach ($r as $unidade) {
-                $this->unidades[$unidade['label']] = $unidade['id'];
-            }
-        }
-        if (!$label == null or strpos($label, "PC") >= 0) {
-            $label = "UN";
-        }
-        // Se não achar, retorna o 999999 (ERRO DE IMPORTAÇÃO)
-        return $this->unidades[$label] ? $this->unidades[$label] : $this->unidades['ERRO'];
-    }
-
-    private $grades;
-
-    private function findGradeByCodigo($codigo)
-    {
-        if (!$this->grades) {
-            $this->grades = array();
-            $sql = "SELECT id, codigo FROM est_grade";
-            $r = $this->dbbonerp->query($sql)->result_array();
-            foreach ($r as $grade) {
-                $this->grades[$grade['codigo']] = $grade['id'];
-            }
-        }
-        // Se não achar, retorna o 999999 (ERRO DE IMPORTAÇÃO)
-        return $this->grades[$codigo] ? $this->grades[$codigo] : $this->grades['99'];
-    }
-
     /**
-     * TRUNCATE TABLE est_produto_preco e reinserções desde 201401.
-     */
-    private function corrigirPrecos()
-    {
-        $this->dbbonerp->trans_start();
-
-        $this->dbbonerp->query("TRUNCATE TABLE est_produto_preco");
-
-        $mesano_ini = "201401";
-        $hoje = new DateTime();
-        $mesano_fim = $hoje->format("Ym");
-
-        $mesesanos = Datetime_utils::mesano_list($mesano_ini, $mesano_fim);
-
-        foreach ($mesesanos as $mesano) {
-            $this->mesano = $mesano;
-
-            $query = $this->dbekt->get_where("ekt_produto", array(
-                'mesano' => $mesano
-            ));
-            $result = $query->result_array();
-
-            // Pega todos os produtos da ekt_produto para o $mesano
-            $i = 1;
-            foreach ($result as $r) {
-                try {
-                    // Para cada ekt_produto, encontra o est_produto
-                    $query = $this->dbbonerp->query("SELECT * FROM est_produto WHERE reduzido_ekt = ? AND trim(descricao) LIKE ? ", array(
-                        $r['REDUZIDO'],
-                        trim($r['DESCRICAO'])
-                    ));
-                    $result = $query->result_array();
-                    $qtde = count($result);
-                    if ($qtde != 1) {
-                        throw new Exception("Erro. Qtde deveria ser exatamente 1 para reduzido = '" . $r['REDUZIDO'] . "' e descricao = '" . $r['DESCRICAO'] . "'. QTDE='" . $qtde . "'");
-                    }
-                    $produto = $result[0];
-                    $this->salvarProdutoPreco($r, $produto['id'], $mesano);
-                    $this->logger->info($i++ . " (" . $r['id'] . ")");
-                } catch (Exception $e) {
-                    print_r($e->getMessage());
-                    exit();
-                }
-            }
-        }
-
-        $this->dbbonerp->trans_complete();
-
-        $this->logger->info(PHP_EOL);
-        $this->logger->info("--------------------------------------------------------------");
-        $this->logger->info("--------------------------------------------------------------");
-        $this->logger->info("--------------------------------------------------------------");
-    }
-
-    /**
-     * Salva o est_produto_preco.
      *
-     * @param $produtoEkt
-     * @param $produtoId
-     * @param $mesano
      */
-    private function salvarProdutoPreco($produtoEkt, $produtoId, $mesano)
+    private function gerarProdutoSaldoHistorico(): void
     {
-        if (!$produtoEkt['DATA_PCUSTO']) {
-            $produtoEkt['DATA_PCUSTO'] = DateTime::createFromFormat('Ymd', $mesano . "01")->format('Y-m-d');
-        }
-
-        if (!$produtoEkt['DATA_PVENDA']) {
-            $produtoEkt['DATA_PVENDA'] = DateTime::createFromFormat('Ymd', $mesano . "01")->format('Y-m-d');
-        }
-
-        $query = $this->dbbonerp->get_where('est_produto_preco', array(
-            'produto_id' => $produtoId,
-            'dt_custo' => $produtoEkt['DATA_PCUSTO'],
-            'dt_preco_venda' => $produtoEkt['DATA_PVENDA'],
-            'preco_custo' => $produtoEkt['PCUSTO'],
-            'preco_vista' => $produtoEkt['PVISTA'],
-            'preco_prazo' => $produtoEkt['PPRAZO']
-        ));
-        $existe = $query->result_array();
-        if (count($existe) > 0) {
-            $this->existentes++;
-            return;
-        }
-
-        $dtMesano = DateTime::createFromFormat('Ymd', $mesano . "01")->format('Y-m-d');
-
-        $data = array(
-            'inserted' => date("Y-m-d H:i:s"),
-            'updated' => date("Y-m-d H:i:s"),
-            'version' => 0,
-            'coeficiente' => $produtoEkt['COEF'],
-            'custo_operacional' => $produtoEkt['MARGEMC'],
-            'dt_custo' => $produtoEkt['DATA_PCUSTO'],
-            'dt_preco_venda' => $produtoEkt['DATA_PVENDA'],
-            'margem' => $produtoEkt['MARGEM'],
-            'prazo' => $produtoEkt['PRAZO'],
-            'preco_custo' => $produtoEkt['PCUSTO'],
-            'preco_prazo' => $produtoEkt['PPRAZO'],
-            'preco_promo' => $produtoEkt['PPROMO'],
-            'preco_vista' => $produtoEkt['PVISTA'],
-            'estabelecimento_id' => 1,
-            'user_inserted_id' => 1,
-            'user_updated_id' => 1,
-            'produto_id' => $produtoId,
-            'custo_financeiro' => 0.15,
-            'mesano' => $dtMesano
-        );
-
-        $this->dbbonerp->insert('est_produto_preco', $data) or $this->exit_db_error();
-
-        $this->inseridos++;
-    }
-
-    /**
-     * @param $reduzidoEkt
-     * @param null $mesano
-     * @return
-     * @throws Exception
-     */
-    private function findByReduzidoEkt($reduzidoEkt, $mesano = null)
-    {
-        $params = array();
-
-        $sql = "SELECT id FROM est_produto WHERE reduzido_ekt = ? ";
-        $params[] = $reduzidoEkt;
-
-        if ($mesano) {
-            $sql .= "AND (reduzido_ekt_desde <= ? OR reduzido_ekt_desde IS NULL) " . "AND (reduzido_ekt_ate >= ? OR reduzido_ekt_ate IS NULL) ";
-            $params[] = DateTime::createFromFormat('Ym', $mesano)->format('Y-m-d');
-            $params[] = DateTime::createFromFormat('Ym', $mesano)->format('Y-m-d');
-        }
-
-        $sql .= " ORDER BY reduzido_ekt_desde";
-
-        $query = $this->dbbonerp->query($sql, $params);
-        $result = $query->result_array();
-
-        if ($mesano && count($result) > 1) {
-            throw new Exception("Mais de um produto com o mesmo reduzido ('$reduzidoEkt) no período ('$mesano')");
-        } else {
-            return $result;
-        }
-    }
-
-    private function gerarProdutoSaldoHistorico()
-    {
-        $this->dbbonerp->trans_start();
+        $this->dbcrosier->trans_start();
 
         $this->logger->info("Iniciando gerarProdutoSaldoHistorico() para mesano = '" . $this->mesano . "'");
 
-        $this->dbbonerp->query("DELETE FROM est_produto_saldo_historico WHERE DATE_FORMAT(mesano, '%Y%m') = ?", array(
+        $this->dbcrosier->query("DELETE FROM est_produto_saldo_historico WHERE DATE_FORMAT(mesano, '%Y%m') = ?", array(
             $this->mesano
         ));
 
         $ekts = $this->dbekt->query(
-            "SELECT
+            'SELECT
         REDUZIDO,
         coalesce(qt01,0)+coalesce(qt02,0)+coalesce(qt03,0)+coalesce(qt04,0)+coalesce(qt05,0)+coalesce(qt06,0)+
         coalesce(qt07,0)+coalesce(qt08,0)+coalesce(qt09,0)+coalesce(qt10,0)+coalesce(qt11,0)+coalesce(qt12,0) as qtde_total
         FROM
         ekt_produto
         WHERE
-        mesano = ? AND REDUZIDO != 88888
-        ORDER BY reduzido", array(
+        mesano = ? AND REDUZIDO !== 88888
+        ORDER BY reduzido', array(
             $this->mesano
         ))->result_array();
 
         $total = count($ekts);
         $i = 0;
 
-        $r_prods = $this->dbbonerp->query("SELECT reduzido_ekt, produto_id FROM est_produto_reduzidoektmesano WHERE mesano = ?", array(
+        $r_prods = $this->dbcrosier->query('SELECT reduzido_ekt, produto_id FROM est_produto_reduzidoektmesano WHERE mesano = ?', array(
             $this->mesano
         ))->result_array();
 
-        if (count($r_prods) != $total) {
-            $this->logger->info("qtde de produtos diferem. EKT: [" . $total . "] est_produto_reduzidoektmesano: [" . count($r_prods) . "]");
+        if (count($r_prods) !== $total) {
+            $this->logger->info('qtde de produtos diferem. EKT: [' . $total . '] est_produto_reduzidoektmesano: [' . count($r_prods) . ']');
             return;
         }
 
@@ -856,7 +754,7 @@ class ImportarProdutos extends CI_Controller
         }
 
         foreach ($ekts as $ekt) {
-            $this->logger->debug(" >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> " . ++$i . "/" . $total);
+            $this->logger->debug(' >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ' . ++$i . '/' . $total);
 
             $produto_id = $prods[$ekt['REDUZIDO']];
 
@@ -870,152 +768,161 @@ class ImportarProdutos extends CI_Controller
             $produtoSaldo['user_inserted_id'] = 1;
             $produtoSaldo['user_updated_id'] = 1;
 
-            $this->dbbonerp->insert('est_produto_saldo_historico', $produtoSaldo) or $this->exit_db_error("Erro ao inserir na est_produto_saldo_historico. produto id [" . $produto_id . "]");
+            $this->dbcrosier->insert('est_produto_saldo_historico', $produtoSaldo) or $this->exit_db_error('Erro ao inserir na est_produto_saldo_historico. produto id [' . $produto_id . ']');
         }
 
-        $qry = $this->dbbonerp->query("CALL sp_total_inventario(?,@a,@b,@c)", array(
+        $qry = $this->dbcrosier->query('CALL sp_total_inventario(?,@a,@b,@c)', array(
             $this->mesano
         ));
         $result = $qry->result_array();
-        mysqli_next_result($this->dbbonerp->conn_id);
+        mysqli_next_result($this->dbcrosier->conn_id);
         $qry->free_result();
 
-        if (count($result) == 1) {
+        if (count($result) === 1) {
             $totalCustos = $result[0]['total_custo'];
             $totalPrecosPrazo = $result[0]['total_precos_prazo'];
             $totalPecas = $result[0]['total_pecas'];
 
-            $this->logger->info("--------------------------------------------------------------");
-            $this->logger->info("Total Custo: " . $totalCustos);
-            $this->logger->info("Total Venda: " . $totalPrecosPrazo);
-            $this->logger->info("Total Pecas: " . $totalPecas);
-            $this->logger->info("--------------------------------------------------------------");
+            $this->logger->info('--------------------------------------------------------------');
+            $this->logger->info('Total Custo: ' . $totalCustos);
+            $this->logger->info('Total Venda: ' . $totalPrecosPrazo);
+            $this->logger->info('Total Pecas: ' . $totalPecas);
+            $this->logger->info('--------------------------------------------------------------');
 
-            $this->handleRegistroConferencia("INVENT PECAS (IMPORTADO)", $this->dtMesano->format('Y-m-t'), $totalPecas);
-            $this->handleRegistroConferencia("INVENT CUSTO (IMPORTADO)", $this->dtMesano->format('Y-m-t'), $totalCustos);
-            $this->handleRegistroConferencia("INVENT VENDA (IMPORTADO)", $this->dtMesano->format('Y-m-t'), $totalPrecosPrazo);
+            $this->handleRegistroConferencia('INVENT PECAS (IMPORTADO)', $this->dtMesano->format('Y-m-t'), $totalPecas);
+            $this->handleRegistroConferencia('INVENT CUSTO (IMPORTADO)', $this->dtMesano->format('Y-m-t'), $totalCustos);
+            $this->handleRegistroConferencia('INVENT VENDA (IMPORTADO)', $this->dtMesano->format('Y-m-t'), $totalPrecosPrazo);
         }
 
-        $this->logger->info("Finalizando... commitando a transação...");
+        $this->logger->info('Finalizando... commitando a transação...');
 
-        $this->dbbonerp->trans_complete();
+        $this->dbcrosier->trans_complete();
     }
 
-    private function handleRegistroConferencia($descricao, $dtMesano, $valor)
+    private function handleRegistroConferencia($descricao, $dtMesano, $valor): void
     {
-        $this->logger->info("handleRegistroConferencia - [" . $descricao . "]");
+        $this->logger->info('handleRegistroConferencia - [' . $descricao . ']');
         $params = array(
             $descricao,
             $dtMesano
         );
-        $r = $this->dbbonerp->query("SELECT id FROM fin_reg_conf WHERE descricao = ? AND dt_registro = ?", $params)->result_array();
+        $r = $this->dbcrosier->query('SELECT id FROM fin_reg_conf WHERE descricao = ? AND dt_registro = ?', $params)->result_array();
 
         $reg['descricao'] = $descricao;
         $reg['dt_registro'] = $dtMesano;
         $reg['valor'] = $valor;
 
-        if (count($r) == 1) {
+        if (count($r) === 1) {
             $reg['id'] = $r[0]['id'];
         }
-        $model = new \CIBases\Models\DAO\Base\Base_model('fin_reg_conf', 'bonerp');
-        $model->setDb($this->dbbonerp);
+        $model = new \CIBases\Models\DAO\Base\Base_model('fin_reg_conf', 'crosier');
+        $model->setDb($this->dbcrosier);
         $model->save($reg);
-        $this->logger->info("OK!!!");
-    }
-
-    private function exit_db_error($msg = null)
-    {
-        $this->logger->info(str_pad("", 100, "*"));
-        $this->logger->info($msg ? $msg : '');
-        $this->logger->info("LAST QUERY: " . $this->dbbonerp->last_query());
-        print_r($this->dbbonerp->error());
-        $this->logger->info(str_pad("", 100, "*"));
-        exit();
+        $this->logger->info('OK!!!');
     }
 
     /**
-     * Corrige os bonerp.est_produto.reduzido para o novo padrão: AAMM0000099999.
+     * Quando a importação é para o mês corrente, percorre os produtos que estavam com reduzido_ekt_ate = null e
+     * verifica se não tiveram substituição de reduzido no EKT.
      */
-    private function corrigirReduzidos()
+    private function corrigeReduzidoEktAteMesCorrente(): void
     {
-        $time_start = microtime(true);
+        $this->logger->info('.................... CORRIGINDO reduzido_ekt_ate PARA IMPORTAÇÃO DE MÊS CORRENTE...');
+        $sql = 'SELECT produto_id FROM est_produto_reduzidoektmesano WHERE mesano = ? AND produto_id NOT IN (SELECT id FROM est_produto WHERE reduzido_ekt_ate IS NULL)';
+        // ou seja, não existe um registro na est_produto_reduzidoektmesano para o mês corrente para tal est_produto.id
+        $query = $this->dbcrosier->query($sql, [$this->agora->format('Ym')]);
+        $result = $query->result_array();
+        $total = count($result);
+        $i = 1;
 
-        $this->logger->info("Iniciando a correção de reduzidos...");
+        $ultimoDiaMesAnterior = new \DateTime();
+        $ultimoDiaMesAnterior->setTime(0, 0, 0, 0);
+        $ultimoDiaMesAnterior->setDate($ultimoDiaMesAnterior->format('Y'), $ultimoDiaMesAnterior->format('m') - 1, 15)->format('Y-m-t');
+        $ultimoDiaMesAnterior = $ultimoDiaMesAnterior->format('Y-m-d');
 
-        $this->dbbonerp->trans_start();
+        foreach ($result as $r) {
+            try {
+                $estProduto = $this->produto_model->findby_id($r['produto_id']);
+                $estProduto['reduzido_ekt_ate'] = $ultimoDiaMesAnterior;
+                $this->dbcrosier->update('est_produto', $estProduto, array(
+                    'id' => $estProduto['id']
+                )) or $this->exit_db_error("Erro ao atualizar 'reduzido_ekt_ate'");
 
-        $r = $this->dbbonerp->query("SELECT id, reduzido, reduzido_ekt FROM est_produto")->result_array();
-        $total = count($r);
-        $i = 0;
-        foreach ($r as $produto) {
-            $this->logger->debug(" >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> " . ++$i . "/" . $total);
-            $reduzido = $produto['reduzido'];
-            if ($reduzido != 88888) {
-                if ($reduzido[0] == 9)
-                    continue;
+                $this->logger->info(' ... ' .
+                    str_pad($i++, 6, '0', STR_PAD_LEFT) . '/' . str_pad($total, 6, '0', STR_PAD_LEFT) .
+                    ' (' . $r['produto_id'] . ')');
+            } catch (Exception $e) {
+                print_r($e->getMessage());
+                exit();
+            }
+        }
 
-                $novo = substr($reduzido, 0, 4) . "00000" . str_pad($produto['reduzido_ekt'], 5, '0', STR_PAD_LEFT);
-                if ($novo != $reduzido) {
+        $this->logger->info('.................... OK');
 
-                    while (true) {
-                        $existe = $this->dbbonerp->query("SELECT 1 FROM est_produto WHERE reduzido = ?", array(
-                            $novo
-                        ))->result_array();
-                        if (count($existe) > 0) {
-                            $novo = substr($novo, 0, 4) . "0" . str_pad(rand(1, 999), 3, '0', STR_PAD_LEFT) . "0" . str_pad($produto['reduzido_ekt'], 5, '0', STR_PAD_LEFT);
-                        } else {
-                            break;
-                        }
+    }
+
+    private function corrigirCampoAtual(): void
+    {
+        $mesanoAtual = (new DateTime())->format('Ym');
+        $this->dbcrosier->query('UPDATE est_produto SET atual = false');
+        $this->dbcrosier->query('UPDATE est_produto SET atual = true WHERE id IN (SELECT produto_id FROM est_produto_reduzidoektmesano WHERE mesano = ' . $mesanoAtual . ')');
+    }
+
+    /**
+     * TRUNCATE na est_produto_reduzidoektmesano e NULL para reduzido_ekt_desde e reduzido_ekt_ate.
+     * Percorre todos desde 201401 e vai inserindo na est_produto_reduzidoektmesano.
+     */
+    private function corrigirProdutosReduzidoEktDesdeAte(): void
+    {
+        $this->dbcrosier->trans_start();
+
+        $this->logger->info('Iniciando correção para est_produto_reduzidoektmesano e NULL para reduzido_ekt_desde e reduzido_ekt_ate...');
+        $this->logger->info('.');
+        $this->logger->info('.');
+        $this->logger->info('TRUNCATE TABLE est_produto_reduzidoektmesano');
+        $this->logger->info('OK');
+
+        $this->dbcrosier->query('TRUNCATE TABLE est_produto_reduzidoektmesano');
+        $mesano_ini = '201401';
+        $hoje = new DateTime();
+        $mesano_fim = $hoje->format('Ym');
+        $mesesanos = Datetime_utils::mesano_list($mesano_ini, $mesano_fim);
+
+        foreach ($mesesanos as $mesano) {
+            $this->mesano = $mesano;
+            $this->dtMesano = DateTime::createFromFormat('Ymd', $mesano . '01');
+            $this->dtMesano->setTime(0, 0, 0, 0);
+
+            // Pega todos os produtos da ekt_produto para o $mesano
+            $query = $this->dbekt->get_where('ekt_produto', ['mesano' => $mesano]);//, 'reduzido' => 1507]);
+            $result = $query->result_array();
+            $total = count($result);
+
+            $i = 1;
+            foreach ($result as $r) {
+                try {
+
+                    // Para cada ekt_produto, encontra o est_produto
+                    $query = $this->dbcrosier->query('SELECT * FROM est_produto WHERE reduzido_ekt = ? AND trim(descricao) LIKE ?', array(
+                        $r['REDUZIDO'],
+                        trim($r['DESCRICAO'])
+                    ));
+                    $result = $query->result_array();
+                    $qtde = count($result);
+                    if ($qtde !== 1) {
+                        throw new \RuntimeException("Erro. Qtde deveria ser exatamente 1 para reduzido = '" . $r['REDUZIDO'] . "' e descricao = '" . $r['DESCRICAO'] . "'. QTDE='" . $qtde . "'");
                     }
-
-                    $produto['reduzido'] = $novo;
-
-                    $this->dbbonerp->update('est_produto', $produto, array(
-                        'id' => $produto['id']
-                    )) or $this->exit_db_error("Erro ao atualizar 'reduzido'");
+                    $this->insereNaReduzidoEktMesano($result[0]);
+                    $this->logger->info($mesano . ' ... ' . str_pad($r['REDUZIDO'], 6, 0, STR_PAD_LEFT) . ' ....................................................................... ' . str_pad($i++, 6, '0', STR_PAD_LEFT) . '/' . str_pad($total, 6, '0', STR_PAD_LEFT) . ' (' . $r['id'] . ')');
+                } catch (Exception $e) {
+                    print_r($e->getMessage());
+                    exit();
                 }
             }
         }
-        $this->logger->info("Finalizando... commitando a transação...");
 
-        $this->dbbonerp->trans_complete();
-
-        $time_end = microtime(true);
-        $execution_time = ($time_end - $time_start);
-        $this->logger->info(PHP_EOL);
-        $this->logger->info("----------------------------------");
-        $this->logger->info("Total Execution Time: " . $execution_time . "s");
-        $this->logger->closeLog();
-        $this->logger->sendMail();
-    }
-
-
-    /**
-     * Insere o registro na est_produto_reduzidoektmesano se ainda não existir para o $this->mesano.
-     *
-     * @param $produtoBonERP
-     */
-    private function insereNaReduzidoEktMesano($produtoBonERP)
-    {
-        $produtoId = $produtoBonERP['id'];
-        $reduzido_ekt = $produtoBonERP['reduzido_ekt'];
-
-        // Verifica se já tem registro marcando este produto no mesano
-        $sql = "SELECT * FROM est_produto_reduzidoektmesano WHERE produto_id = ? AND mesano = ? AND reduzido_ekt = ?";
-        $params = array(
-            $produtoId,
-            $this->mesano,
-            $reduzido_ekt
-        );
-        $r = $this->dbbonerp->query($sql, $params)->result_array();
-
-        // Se ainda não tem na est_produto_reduzidoektmesano, insere...
-        if (count($r) == 0) {
-            $codektmesano['produto_id'] = $produtoId;
-            $codektmesano['mesano'] = $this->mesano;
-            $codektmesano['reduzido_ekt'] = $reduzido_ekt;
-            $this->dbbonerp->insert('est_produto_reduzidoektmesano', $codektmesano) or $this->exit_db_error("Erro ao inserir na est_produto_reduzidoektmesano. produto id [" . $produtoId . "]");
-        }
+        $this->logger->info('Finalizando... commitando a transação...');
+        $this->dbcrosier->trans_complete();
     }
 
     /**
@@ -1023,22 +930,22 @@ class ImportarProdutos extends CI_Controller
      *
      * @throws Exception
      */
-    private function corrigeReduzidoEktDesdeAte()
+    private function corrigeReduzidoEktDesdeAte(): void
     {
         $this->logger->info('Iniciando correção de reduzido_ekt_desde e reduzido_ekt_ate');
 
         $this->logger->info('UPDATE est_produto SET reduzido_ekt_desde = NULL, reduzido_ekt_ate = NULL');
-        $this->dbbonerp->query("UPDATE est_produto SET reduzido_ekt_desde = NULL, reduzido_ekt_ate = NULL");
+        $this->dbcrosier->query('UPDATE est_produto SET reduzido_ekt_desde = NULL, reduzido_ekt_ate = NULL');
         $this->logger->info('OK');
 
-        $sql = "SELECT * FROM est_produto WHERE reduzido_ekt != 88888 AND TRIM(descricao) != ''";
-        $rs = $this->dbbonerp->query($sql)->result_array();
+        $sql = "SELECT * FROM est_produto WHERE reduzido_ekt !== 88888 AND TRIM(descricao) !== ''";
+        $rs = $this->dbcrosier->query($sql)->result_array();
 
         // Monto toda a tabela num array para não precisar executar um SELECT pra cada produto no foreach.
-        $sql = "SELECT * FROM est_produto_reduzidoektmesano ORDER BY produto_id, mesano";
-        $todos = $this->dbbonerp->query($sql)->result_array();
+        $sql = 'SELECT * FROM est_produto_reduzidoektmesano ORDER BY produto_id, mesano';
+        $todos = $this->dbcrosier->query($sql)->result_array();
         if (!$todos or count($todos) < 1) {
-            throw new \Exception("Nenhum registro encontrado na est_produto_reduzidoektmesano");
+            throw new \Exception('Nenhum registro encontrado na est_produto_reduzidoektmesano');
         }
         $reduzidosektmesano = [];
         foreach ($todos as $t) {
@@ -1059,66 +966,59 @@ class ImportarProdutos extends CI_Controller
             $estProduto_['reduzido_ekt_desde'] = (\DateTime::createFromFormat('Ym', $mesano_ini))->format('Y-m-d');
             $estProduto_['reduzido_ekt_ate'] = (\DateTime::createFromFormat('Ym', $mesano_fim))->format('Y-m-t');
 
-            $this->dbbonerp->update('est_produto', $estProduto_, array(
+            $this->dbcrosier->update('est_produto', $estProduto_, array(
                 'id' => $estProduto['id']
             )) or $this->exit_db_error("Erro ao atualizar 'reduzido_ekt_desde' e 'reduzido_ekt_ate'");
 
 
-            $this->logger->info(' ... ' . str_pad($estProduto['reduzido_ekt'], 6, 0, STR_PAD_LEFT) . ' ....................................................................... ' . str_pad($i++, 6, '0', STR_PAD_LEFT) . "/" . str_pad($total, 6, '0', STR_PAD_LEFT));
+            $this->logger->info(' ... ' . str_pad($estProduto['reduzido_ekt'], 6, 0, STR_PAD_LEFT) . ' ....................................................................... ' . str_pad($i++, 6, '0', STR_PAD_LEFT) . '/' . str_pad($total, 6, '0', STR_PAD_LEFT));
 
         }
         $mesano_atual = $this->agora->format('Ym');
-        $this->dbbonerp->query("UPDATE est_produto SET reduzido_ekt_ate = NULL WHERE DATE_FORMAT(reduzido_ekt_ate, '%Y%m') = ?", [$mesano_atual]);
+        $this->dbcrosier->query("UPDATE est_produto SET reduzido_ekt_ate = NULL WHERE DATE_FORMAT(reduzido_ekt_ate, '%Y%m') = ?", [$mesano_atual]);
         $this->logger->info('OK');
     }
 
-
     /**
-     * TRUNCATE na est_produto_reduzidoektmesano e NULL para reduzido_ekt_desde e reduzido_ekt_ate.
-     * Percorre todos desde 201401 e vai inserindo na est_produto_reduzidoektmesano.
+     * TRUNCATE TABLE est_produto_preco e reinserções desde 201401.
      */
-    private function corrigirProdutosReduzidoEktDesdeAte()
+    private function corrigirPrecos(): void
     {
-        $this->dbbonerp->trans_start();
+        $this->dbcrosier->trans_start();
 
-        $this->logger->info('Iniciando correção para est_produto_reduzidoektmesano e NULL para reduzido_ekt_desde e reduzido_ekt_ate...');
-        $this->logger->info('.');
-        $this->logger->info('.');
-        $this->logger->info('TRUNCATE TABLE est_produto_reduzidoektmesano');
-        $this->logger->info('OK');
+        $this->dbcrosier->query('TRUNCATE TABLE est_produto_preco');
 
-        $this->dbbonerp->query("TRUNCATE TABLE est_produto_reduzidoektmesano");
-        $mesano_ini = "201401";
+        $mesano_ini = '201401';
         $hoje = new DateTime();
-        $mesano_fim = $hoje->format("Ym");
+        $mesano_fim = $hoje->format('Ym');
+
         $mesesanos = Datetime_utils::mesano_list($mesano_ini, $mesano_fim);
 
         foreach ($mesesanos as $mesano) {
             $this->mesano = $mesano;
-            $this->dtMesano = DateTime::createFromFormat('Ymd', $mesano . '01');
-            $this->dtMesano->setTime(0, 0, 0, 0);
+
+            $query = $this->dbekt->get_where('ekt_produto', array(
+                'mesano' => $mesano
+            ));
+            $result = $query->result_array();
 
             // Pega todos os produtos da ekt_produto para o $mesano
-            $query = $this->dbekt->get_where("ekt_produto", ['mesano' => $mesano]);//, 'reduzido' => 1507]);
-            $result = $query->result_array();
-            $total = count($result);
-
             $i = 1;
             foreach ($result as $r) {
                 try {
-
                     // Para cada ekt_produto, encontra o est_produto
-                    $query = $this->dbbonerp->query("SELECT * FROM est_produto WHERE reduzido_ekt = ? AND trim(descricao) LIKE ?", array(
+                    $query = $this->dbcrosier->query('SELECT * FROM est_produto WHERE reduzido_ekt = ? AND trim(descricao) LIKE ? ', array(
                         $r['REDUZIDO'],
                         trim($r['DESCRICAO'])
                     ));
                     $result = $query->result_array();
                     $qtde = count($result);
-                    if ($qtde != 1) {
-                        throw new Exception("Erro. Qtde deveria ser exatamente 1 para reduzido = '" . $r['REDUZIDO'] . "' e descricao = '" . $r['DESCRICAO'] . "'. QTDE='" . $qtde . "'");
+                    if ($qtde !== 1) {
+                        throw new \RuntimeException("Erro. Qtde deveria ser exatamente 1 para reduzido = '" . $r['REDUZIDO'] . "' e descricao = '" . $r['DESCRICAO'] . "'. QTDE='" . $qtde . "'");
                     }
-                    $this->insereNaReduzidoEktMesano($result[0]);
-                    $this->logger->info($mesano . ' ... ' . str_pad($r['REDUZIDO'], 6, 0, STR_PAD_LEFT) . ' ....................................................................... ' . str_pad($i++, 6, '0', STR_PAD_LEFT) . "/" . str_pad($total, 6, '0', STR_PAD_LEFT) . " (" . $r['id'] . ")");
+                    $produto = $result[0];
+                    $this->salvarProdutoPreco($r, $produto['id'], $mesano);
+                    $this->logger->info($i++ . ' (' . $r['id'] . ')');
                 } catch (Exception $e) {
                     print_r($e->getMessage());
                     exit();
@@ -1126,85 +1026,153 @@ class ImportarProdutos extends CI_Controller
             }
         }
 
-        $this->logger->info("Finalizando... commitando a transação...");
-        $this->dbbonerp->trans_complete();
-    }
+        $this->dbcrosier->trans_complete();
 
-
-    private function corrigirCampoAtual()
-    {
-        $mesanoAtual = (new DateTime())->format('Ym');
-        $this->dbbonerp->query('UPDATE est_produto SET atual = false');
-        $this->dbbonerp->query('UPDATE est_produto SET atual = true WHERE id IN (SELECT produto_id FROM est_produto_reduzidoektmesano WHERE mesano = ' . $mesanoAtual . ')');
-    }
-
-
-    /**
-     * Quando a importação é para o mês corrente, percorre os produtos que estavam com reduzido_ekt_ate = null e
-     * verifica se não tiveram substituição de reduzido no EKT.
-     */
-    private function corrigeReduzidoEktAteMesCorrente()
-    {
-        $this->logger->info(".................... CORRIGINDO reduzido_ekt_ate PARA IMPORTAÇÃO DE MÊS CORRENTE...");
-        $sql = "SELECT produto_id FROM est_produto_reduzidoektmesano WHERE mesano = ? AND produto_id NOT IN (SELECT id FROM est_produto WHERE reduzido_ekt_ate IS NULL)";
-        // ou seja, não existe um registro na est_produto_reduzidoektmesano para o mês corrente para tal est_produto.id
-        $query = $this->dbbonerp->query($sql, [$this->agora->format('Ym')]);
-        $result = $query->result_array();
-        $total = count($result);
-        $i = 1;
-
-        $ultimoDiaMesAnterior = new \DateTime();
-        $ultimoDiaMesAnterior->setTime(0, 0, 0, 0);
-        $ultimoDiaMesAnterior->setDate($ultimoDiaMesAnterior->format('Y'), $ultimoDiaMesAnterior->format('m') - 1, 15)->format('Y-m-t');
-        $ultimoDiaMesAnterior = $ultimoDiaMesAnterior->format('Y-m-d');
-
-        foreach ($result as $r) {
-            try {
-                $estProduto = $this->produto_model->findby_id($r['produto_id']);
-                $estProduto['reduzido_ekt_ate'] = $ultimoDiaMesAnterior;
-                $this->dbbonerp->update('est_produto', $estProduto, array(
-                    'id' => $estProduto['id']
-                )) or $this->exit_db_error("Erro ao atualizar 'reduzido_ekt_ate'");
-
-                $this->logger->info(' ... ' .
-                    str_pad($i++, 6, '0', STR_PAD_LEFT) . "/" . str_pad($total, 6, '0', STR_PAD_LEFT) .
-                    " (" . $r['produto_id'] . ")");
-            } catch (Exception $e) {
-                print_r($e->getMessage());
-                exit();
-            }
-        }
-
-        $this->logger->info(".................... OK");
-
+        $this->logger->info(PHP_EOL);
+        $this->logger->info('--------------------------------------------------------------');
+        $this->logger->info('--------------------------------------------------------------');
+        $this->logger->info('--------------------------------------------------------------');
     }
 
     /**
      * Realiza conferências
      */
-    private function conferencias()
+    private function conferencias(): void
     {
-        $this->logger->info("");
-        $this->logger->info("");
-        $this->logger->info("");
-        $this->logger->info("**********************************************************");
-        $this->logger->info("**********************************************************");
-        $this->logger->info("******************** CONFERÊNCIAS ************************");
-        $this->logger->info("**********************************************************");
-        $this->logger->info("**********************************************************");
-        $this->logger->info("");
+        $this->logger->info('');
+        $this->logger->info('');
+        $this->logger->info('');
+        $this->logger->info('**********************************************************');
+        $this->logger->info('**********************************************************');
+        $this->logger->info('******************** CONFERÊNCIAS ************************');
+        $this->logger->info('**********************************************************');
+        $this->logger->info('**********************************************************');
+        $this->logger->info('');
 
-        $r = $this->dbbonerp->query("SELECT count(*) as qtde FROM est_produto WHERE reduzido_ekt != '88888' AND trim(descricao) != '' AND reduzido_ekt_desde IS NULL")->result_array();
+        $r = $this->dbcrosier->query("SELECT count(*) as qtde FROM est_produto WHERE reduzido_ekt !== '88888' AND trim(descricao) !== '' AND reduzido_ekt_desde IS NULL")->result_array();
         $this->logger->info("Qtde est_produto.reduzido_ekt_desde = NULL : '" . (($r and isset($r['qtde'])) ? $r['qtde'] : '0') . "'");
 
-        $r = $this->dbbonerp->query("SELECT reduzido_ekt, count(*) as qtde FROM est_produto WHERE reduzido_ekt != '88888' AND trim(descricao) != '' AND reduzido_ekt_ate IS NULL GROUP BY reduzido_ekt HAVING qtde > 1")->result_array();
+        $r = $this->dbcrosier->query("SELECT reduzido_ekt, count(*) as qtde FROM est_produto WHERE reduzido_ekt !== '88888' AND trim(descricao) !== '' AND reduzido_ekt_ate IS NULL GROUP BY reduzido_ekt HAVING qtde > 1")->result_array();
         $this->logger->info("Duplicação de reduzido_ekt_ate = NULL      : '" . (($r and isset($r['qtde'])) ? $r['qtde'] : '0') . "'");
 
-        $this->logger->info("");
-        $this->logger->info("**********************************************************");
-        $this->logger->info("**********************************************************");
-        $this->logger->info("**********************************************************");
+        $this->logger->info('');
+        $this->logger->info('**********************************************************');
+        $this->logger->info('**********************************************************');
+        $this->logger->info('**********************************************************');
 
+    }
+
+    private function getMesAnoList($dtIni, $dtFim)
+    {
+        $dtIni = DateTime::createFromFormat('Y-m-d', $dtIni);
+        $dtFim = DateTime::createFromFormat('Y-m-d', $dtFim);
+        if ($dtFim < $dtIni) {
+            return;
+        }
+        if ($dtIni === null) {
+            throw new \RuntimeException('dtini null');
+        }
+        if ($dtFim === null) {
+            return;
+        }
+        $list = array();
+        $aux = clone $dtIni;
+        $dtFimMesano = $dtFim->format('Ym');
+        do {
+            $mesano = $aux->format('Ym');
+            $list[] = $mesano;
+            if ($mesano === $dtFimMesano)
+                break;
+            $aux->add(new \DateInterval('P1M'));
+        } while (true);
+        return $list;
+    }
+
+    /**
+     * @param $reduzidoEkt
+     * @param null $mesano
+     * @return
+     * @throws Exception
+     */
+    private function findByReduzidoEkt($reduzidoEkt, $mesano = null)
+    {
+        $params = array();
+
+        $sql = 'SELECT id FROM est_produto WHERE reduzido_ekt = ? ';
+        $params[] = $reduzidoEkt;
+
+        if ($mesano) {
+            $sql .= 'AND (reduzido_ekt_desde <= ? OR reduzido_ekt_desde IS NULL) ' . 'AND (reduzido_ekt_ate >= ? OR reduzido_ekt_ate IS NULL) ';
+            $params[] = DateTime::createFromFormat('Ym', $mesano)->format('Y-m-d');
+            $params[] = DateTime::createFromFormat('Ym', $mesano)->format('Y-m-d');
+        }
+
+        $sql .= ' ORDER BY reduzido_ekt_desde';
+
+        $query = $this->dbcrosier->query($sql, $params);
+        $result = $query->result_array();
+
+        if ($mesano && count($result) > 1) {
+            throw new \RuntimeException("Mais de um produto com o mesmo reduzido ('$reduzidoEkt) no período ('$mesano')");
+        } else {
+            return $result;
+        }
+    }
+
+    /**
+     * Corrige os crosier.est_produto.reduzido para o novo padrão: AAMM0000099999.
+     */
+    private function corrigirReduzidos(): void
+    {
+        $time_start = microtime(true);
+
+        $this->logger->info('Iniciando a correção de reduzidos...');
+
+        $this->dbcrosier->trans_start();
+
+        $r = $this->dbcrosier->query('SELECT id, reduzido, reduzido_ekt FROM est_produto')->result_array();
+        $total = count($r);
+        $i = 0;
+        foreach ($r as $produto) {
+            $this->logger->debug(' >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ' . ++$i . '/' . $total);
+            $reduzido = $produto['reduzido'];
+            if ($reduzido !== 88888) {
+                if ($reduzido[0] === 9)
+                    continue;
+
+                $novo = substr($reduzido, 0, 4) . '00000' . str_pad($produto['reduzido_ekt'], 5, '0', STR_PAD_LEFT);
+                if ($novo !== $reduzido) {
+
+                    while (true) {
+                        $existe = $this->dbcrosier->query('SELECT 1 FROM est_produto WHERE reduzido = ?', array(
+                            $novo
+                        ))->result_array();
+                        if (count($existe) > 0) {
+                            $novo = substr($novo, 0, 4) . '0' . str_pad(rand(1, 999), 3, '0', STR_PAD_LEFT) . '0' . str_pad($produto['reduzido_ekt'], 5, '0', STR_PAD_LEFT);
+                        } else {
+                            break;
+                        }
+                    }
+
+                    $produto['reduzido'] = $novo;
+
+                    $this->dbcrosier->update('est_produto', $produto, array(
+                        'id' => $produto['id']
+                    )) or $this->exit_db_error("Erro ao atualizar 'reduzido'");
+                }
+            }
+        }
+        $this->logger->info('Finalizando... commitando a transação...');
+
+        $this->dbcrosier->trans_complete();
+
+        $time_end = microtime(true);
+        $execution_time = ($time_end - $time_start);
+        $this->logger->info(PHP_EOL);
+        $this->logger->info('----------------------------------');
+        $this->logger->info('Total Execution Time: ' . $execution_time . 's');
+        $this->logger->closeLog();
+        $this->logger->sendMail();
     }
 
 
