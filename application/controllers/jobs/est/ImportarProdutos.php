@@ -87,6 +87,10 @@ class ImportarProdutos extends CI_Controller
     private $unidades;
     private $grades;
 
+    /**
+     * ImportarProdutos constructor.
+     * @throws Exception
+     */
     public function __construct()
     {
         parent::__construct();
@@ -187,6 +191,9 @@ class ImportarProdutos extends CI_Controller
         $this->logger->closeLog();
     }
 
+    /**
+     * @param null $estProdutoId
+     */
     private function deletarSaldos($estProdutoId = null): void
     {
         $sql = 'DELETE FROM est_produto_reduzidoektmesano WHERE mesano = ?';
@@ -202,6 +209,9 @@ class ImportarProdutos extends CI_Controller
         $this->dbcrosier->query($sql) or $this->exit_db_error("Erro ao $sql");
     }
 
+    /**
+     * @param null $msg
+     */
     private function exit_db_error($msg = null): void
     {
         $this->logger->info(str_pad('', 100, '*'));
@@ -364,6 +374,11 @@ class ImportarProdutos extends CI_Controller
         return $produto;
     }
 
+
+    /**
+     * @param $codigo
+     * @return mixed
+     */
     private function findDeptoByCodigo($codigo)
     {
         if (!$this->deptos) {
@@ -377,6 +392,11 @@ class ImportarProdutos extends CI_Controller
         return $this->deptos[$codigo] ? $this->deptos[$codigo] : $this->deptos['0'];
     }
 
+
+    /**
+     * @param $codigo
+     * @return mixed
+     */
     private function findSubdeptoByCodigo($codigo)
     {
         if (!$this->subdeptos) {
@@ -394,6 +414,11 @@ class ImportarProdutos extends CI_Controller
         }
     }
 
+
+    /**
+     * @param $codigo
+     * @return mixed
+     */
     private function findGradeByCodigo($codigo)
     {
         if (!$this->grades) {
@@ -407,6 +432,7 @@ class ImportarProdutos extends CI_Controller
         // Se não achar, retorna o 999999 (ERRO DE IMPORTAÇÃO)
         return $this->grades[$codigo] ? $this->grades[$codigo] : $this->grades['99'];
     }
+
 
     /**
      * Monta o est_produto.reduzido
@@ -451,6 +477,10 @@ class ImportarProdutos extends CI_Controller
 
     }
 
+    /**
+     * @param $label
+     * @return mixed
+     */
     private function findUnidadeByLabel($label)
     {
         if (!$this->unidades) {
@@ -799,6 +829,13 @@ class ImportarProdutos extends CI_Controller
         $this->dbcrosier->trans_complete();
     }
 
+
+    /**
+     * @param $descricao
+     * @param $dtMesano
+     * @param $valor
+     * @throws Exception
+     */
     private function handleRegistroConferencia($descricao, $dtMesano, $valor): void
     {
         $this->logger->info('handleRegistroConferencia - [' . $descricao . ']');
@@ -861,6 +898,9 @@ class ImportarProdutos extends CI_Controller
 
     }
 
+    /**
+     * @throws Exception
+     */
     private function corrigirCampoAtual(): void
     {
         $mesanoAtual = (new DateTime())->format('Ym');
@@ -1062,6 +1102,13 @@ class ImportarProdutos extends CI_Controller
 
     }
 
+
+    /**
+     * @param $dtIni
+     * @param $dtFim
+     * @return array|void
+     * @throws Exception
+     */
     private function getMesAnoList($dtIni, $dtFim)
     {
         $dtIni = DateTime::createFromFormat('Y-m-d', $dtIni);
