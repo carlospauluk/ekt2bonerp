@@ -9,20 +9,10 @@ require_once('./application/libraries/util/Datetime_utils.php');
  *
  * Pela linha de comando, chamar com:
  *
- * (debug? export/set XDEBUG_CONFIG="idekey=session_name")
- *
- * set EKT_CSVS_PATH=\\10.1.1.100\export
- * set EKT_LOG_PATH=C:\ekt2crosier\log\
- * set XDEBUG_CONFIG="idekey=session_name"
- *
- * LINUX:
- * export EKT_CSVS_PATH=/mnt/10.1.1.100-export/
- * export EKT_LOG_PATH=/home/dev/github/ekt2crosier/log/
- * export XDEBUG_CONFIG="idekey=session_name"
+ * set EKT_LOG_PATH=/home/carlos/dev/github/bonsucesso/ekt2bonerp/log/
  *
  * IMPORTAR PRODUTOS:
  * php index.php jobs/est/ImportarProdutos importar PROD YYYYMM
- *
  *
  * CORRIGIR PREÇOS
  * php index.php jobs/est/ImportarProdutos importar PRECOS
@@ -36,14 +26,6 @@ class ImportarProdutos extends CI_Controller
     private $logger;
 
     private $agora;
-
-    /**
-     * Qual a pasta dos CSVs.
-     * Será obtido a partir da variável de ambiente EKT_CSVS_PATH.
-     *
-     * @var string
-     */
-    private $csvsPath;
 
     /**
      * Passado pela linha de comando no formato YYYYMM.
@@ -134,13 +116,10 @@ class ImportarProdutos extends CI_Controller
     {
         $time_start = microtime(true);
 
-        $this->csvsPath = getenv('EKT_CSVS_PATH') or die('EKT_CSVS_PATH não informado');
-
         $logPath = getenv('EKT_LOG_PATH') or die('EKT_LOG_PATH não informado');
         $prefix = 'ImportarProdutos' . '_' . $mesano . '_' . $acao . '_';
         $this->logger = new LogWriter($logPath, $prefix);
 
-        $this->logger->info('csvsPath: [' . $this->csvsPath . ']');
         $this->logger->info('logPath: [' . $logPath . ']');
 
         $mesano = $mesano ? $mesano : (new DateTime())->format('Ym');

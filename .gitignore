@@ -39,7 +39,7 @@ application/config/production/*
 
 application/config/database.php
 
-/log
+/log/*
 
 
 /index.php

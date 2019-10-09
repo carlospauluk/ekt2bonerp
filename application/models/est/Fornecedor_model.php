@@ -9,12 +9,12 @@ class Fornecedor_model extends CIBases\Models\DAO\Base\Base_model
 
     public function __construct()
     {
-        parent::__construct("est_fornecedor", "bonerp");
+        parent::__construct('est_fornecedor', 'crosier');
     }
 
     public function findByCodigoEkt($codigo, $mesano)
     {
-        $sql = "SELECT fornecedor_id FROM est_fornecedor_codektmesano WHERE codigo_ekt = ? AND mesano = ?";
+        $sql = 'SELECT fornecedor_id FROM est_fornecedor_codektmesano WHERE codigo_ekt = ? AND mesano = ?';
         
         $params = array(
             $codigo,
@@ -26,10 +26,10 @@ class Fornecedor_model extends CIBases\Models\DAO\Base\Base_model
         $rs = $qry->result_array();
         
         if (count($rs) < 1) {
-            throw new \Exception("Nenhum fornecedor encontrado. Código: " . $codigo);
+            throw new \Exception('Nenhum fornecedor encontrado. Código: ' . $codigo);
         } else {
             if (count($rs) > 1) {
-                throw new \Exception("Mais de um fornecedor encontrado. Código: " . $codigo);
+                throw new \Exception('Mais de um fornecedor encontrado. Código: ' . $codigo);
             } else {
                 return $rs[0]['fornecedor_id'];
             }
@@ -40,10 +40,10 @@ class Fornecedor_model extends CIBases\Models\DAO\Base\Base_model
     {
         
         
-        $ini = $dtMesano->format('Y-m-') . "01";
+        $ini = $dtMesano->format('Y-m-') . '01';
         $fim = $dtMesano->format('Y-m-t');
         
-        $sql = "SELECT id FROM est_fornecedor WHERE codigo_ekt = ? AND codigo_ekt_desde <= ? AND (codigo_ekt_ate IS NULL OR codigo_ekt_ate >= ?)";
+        $sql = 'SELECT id FROM est_fornecedor WHERE codigo_ekt = ? AND codigo_ekt_desde <= ? AND (codigo_ekt_ate IS NULL OR codigo_ekt_ate >= ?)';
         
         $params = array(
             $codigo,
@@ -57,10 +57,10 @@ class Fornecedor_model extends CIBases\Models\DAO\Base\Base_model
         $rs = $qry->result_array();
         
         if (count($rs) < 1) {
-            throw new \Exception("Nenhum fornecedor encontrado. Código: " . $codigo);
+            throw new \Exception('Nenhum fornecedor encontrado. Código: ' . $codigo);
         } else {
             if (count($rs) > 1) {
-                throw new \Exception("Mais de um fornecedor encontrado. Código: " . $codigo);
+                throw new \Exception('Mais de um fornecedor encontrado. Código: ' . $codigo);
             } else {
                 return $rs[0]['id'];
             }

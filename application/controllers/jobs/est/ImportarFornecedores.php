@@ -25,9 +25,9 @@ class ImportarFornecedores extends CI_Controller
     private $dbekt;
 
     /**
-     * Conexão ao db bonerp.
+     * Conexão ao db crosier.
      */
-    private $dbbonerp;
+    private $dbcrosier;
 
     public function __construct()
     {
@@ -36,7 +36,7 @@ class ImportarFornecedores extends CI_Controller
         ini_set('memory_limit', '2048M');
         
         $this->dbekt = $this->load->database('ekt', TRUE);
-        $this->dbbonerp = $this->load->database('bonerp', TRUE);
+        $this->dbcrosier = $this->load->database('crosier', TRUE);
         
         error_reporting(E_ALL);
         ini_set('display_errors', 1);
@@ -48,10 +48,10 @@ class ImportarFornecedores extends CI_Controller
     public function importar($mesano)
     {
         $time_start = microtime(true);
-        $this->dbbonerp->trans_start();
+        $this->dbcrosier->trans_start();
         
         $this->load->model('est/fornecedor_model');
-        $this->fornecedor_model->setDb($this->dbbonerp);
+        $this->fornecedor_model->setDb($this->dbcrosier);
         
         $this->mesano = $mesano;
         $this->dtMesano = DateTime::createFromFormat('Ymd', $mesano . "01");
@@ -90,7 +90,7 @@ class ImportarFornecedores extends CI_Controller
                 $codigoEkt,
                 $nomeFantasia
             );
-            $query = $this->dbbonerp->query("SELECT * FROM vw_est_fornecedor WHERE codigo_ekt = ? AND nome_fantasia = ? AND tipo = 'ESTOQUE'", $params) or $this->exit_db_error();
+            $query = $this->dbcrosier->query("SELECT * FROM vw_est_fornecedor WHERE codigo_ekt = ? AND nome_fantasia = ? AND tipo = 'ESTOQUE'", $params) or $this->exit_db_error();
             $r = $query->result_array();
             
             if (count($r) > 1) {
@@ -103,16 +103,16 @@ class ImportarFornecedores extends CI_Controller
                     $this->salvarFornecedor($fornecedorEkt);
                     $this->inseridos ++;
                 } else {
-                    $fornecedorBonERP = $r[0];
+                    $fornecedorCrosier = $r[0];
                     $this->logger->info("Já existente. Atualizando...");
-                    $this->salvarFornecedor($fornecedorEkt, $fornecedorBonERP);
+                    $this->salvarFornecedor($fornecedorEkt, $fornecedorCrosier);
                     $this->atualizados ++;
                 }
                 $this->logger->debug("OK!!!");
             }
         }
         
-        $this->dbbonerp->trans_complete();
+        $this->dbcrosier->trans_complete();
         
         $this->logger->info(PHP_EOL);
         $this->logger->info("--------------------------------------------------------------");
@@ -135,46 +135,46 @@ class ImportarFornecedores extends CI_Controller
     /**
      *
      * @param
-     *            $fornecedorBonERP
+     *            $fornecedorCrosier
      * @param
      *            $fornecedorEkt
      */
-    private function salvarFornecedor($fornecedorEkt, $fornecedorBonERP = null)
+    private function salvarFornecedor($fornecedorEkt, $fornecedorCrosier = null)
     {
         $atualizando = false;
-        $fornecedorBonERP_id = $fornecedorBonERP['id']; // pego o ID para os casos em que é uma atualização
-        $pessoaId = isset($fornecedorBonERP['pessoa_id']) ? $fornecedorBonERP['pessoa_id'] : null;
+        $fornecedorCrosier_id = $fornecedorCrosier['id']; // pego o ID para os casos em que é uma atualização
+        $pessoaId = isset($fornecedorCrosier['pessoa_id']) ? $fornecedorCrosier['pessoa_id'] : null;
         
-        // $fornecedorBonERP = $this-> array(); // limpo o array pq ele na verdade veio da vw_est_fornecedor, portanto com campos a mais
-        $fornecedorBonERP = $this->fornecedor_model->findby_id($fornecedorBonERP_id);
+        // $fornecedorCrosier = $this-> array(); // limpo o array pq ele na verdade veio da vw_est_fornecedor, portanto com campos a mais
+        $fornecedorCrosier = $this->fornecedor_model->findby_id($fornecedorCrosier_id);
         
-        if ($fornecedorBonERP_id) {
+        if ($fornecedorCrosier_id) {
             $atualizando = true;
-            // $fornecedorBonERP['codigo'] = $fornecedorEkt['CODIGO'];
+            // $fornecedorCrosier['codigo'] = $fornecedorEkt['CODIGO'];
             $this->logger->debug("ATUALIZANDO fornecedor... ");
         } else {
             $this->logger->debug("INSERINDO novo fornecedor... ");
-            $fornecedorBonERP['codigo'] = $this->findNovoCodigo($fornecedorEkt['CODIGO']);
-            $fornecedorBonERP['codigo_ekt_desde'] = $this->dtMesano->format('Y-m-d');
+            $fornecedorCrosier['codigo'] = $this->findNovoCodigo($fornecedorEkt['CODIGO']);
+            $fornecedorCrosier['codigo_ekt_desde'] = $this->dtMesano->format('Y-m-d');
         }
         $this->logger->debug($fornecedorEkt['CODIGO'] . " - " . $fornecedorEkt['NOME_FANTASIA']);
         
-        $fornecedorBonERP['codigo_ekt'] = $fornecedorEkt['CODIGO'];
-        $fornecedorBonERP['inscricao_estadual'] = $fornecedorEkt['INSC'];
-        $fornecedorBonERP['fone1'] = $fornecedorEkt['DDD_FONE'] . $fornecedorEkt['FONE'];
-        $fornecedorBonERP['fone2'] = $fornecedorEkt['DDD_FAX'] . $fornecedorEkt['FAX'];
-        $fornecedorBonERP['contato'] = $fornecedorEkt['CONTATO'];
-        $fornecedorBonERP['representante'] = $fornecedorEkt['NOME_REPRES'];
-        $fornecedorBonERP['representante_contato'] = $fornecedorEkt['DDD_REPRES'] . $fornecedorEkt['FONE_REPRES'];
+        $fornecedorCrosier['codigo_ekt'] = $fornecedorEkt['CODIGO'];
+        $fornecedorCrosier['inscricao_estadual'] = $fornecedorEkt['INSC'];
+        $fornecedorCrosier['fone1'] = $fornecedorEkt['DDD_FONE'] . $fornecedorEkt['FONE'];
+        $fornecedorCrosier['fone2'] = $fornecedorEkt['DDD_FAX'] . $fornecedorEkt['FAX'];
+        $fornecedorCrosier['contato'] = $fornecedorEkt['CONTATO'];
+        $fornecedorCrosier['representante'] = $fornecedorEkt['NOME_REPRES'];
+        $fornecedorCrosier['representante_contato'] = $fornecedorEkt['DDD_REPRES'] . $fornecedorEkt['FONE_REPRES'];
         
         if ($atualizando) {
-            $query = $this->dbbonerp->get_where("bse_pessoa", array(
+            $query = $this->dbcrosier->get_where("bse_pessoa", array(
                 'id' => $pessoaId
             )) or $this->exit_db_error();
             $r = $query->result_array();
             
             if (! $r) {
-                throw new Exception('bse_pessoa não encontrado: ' . $fornecedorBonERP['pessoa_id']);
+                throw new Exception('bse_pessoa não encontrado: ' . $fornecedorCrosier['pessoa_id']);
             }
             $pessoa = $r[0];
         }
@@ -192,7 +192,7 @@ class ImportarFornecedores extends CI_Controller
 
         if ($atualizando) {
             $this->logger->debug("Atualizando bse_pessoa... " . $pessoaId);
-            $this->dbbonerp->update('bse_pessoa', $pessoa, array(
+            $this->dbcrosier->update('bse_pessoa', $pessoa, array(
                 'id' => $pessoaId
             )) or $this->exit_db_error();
         } else {
@@ -201,43 +201,43 @@ class ImportarFornecedores extends CI_Controller
             $pessoa['estabelecimento_id'] = 1;
             $pessoa['user_inserted_id'] = 1;
             $pessoa['user_updated_id'] = 1;
-            $this->dbbonerp->insert('bse_pessoa', $pessoa) or $this->exit_db_error();
-            $pessoaId = $this->dbbonerp->insert_id();
+            $this->dbcrosier->insert('bse_pessoa', $pessoa) or $this->exit_db_error();
+            $pessoaId = $this->dbcrosier->insert_id();
         }
         
-        $fornecedorBonERP['updated'] = date("Y-m-d H:i:s");
-        $fornecedorBonERP['pessoa_id'] = $pessoaId;
-        $fornecedorBonERP['fornecedor_tipo_id'] = 2;
+        $fornecedorCrosier['updated'] = date("Y-m-d H:i:s");
+        $fornecedorCrosier['pessoa_id'] = $pessoaId;
+        $fornecedorCrosier['fornecedor_tipo_id'] = 2;
         
         if ($atualizando) {
             $this->logger->debug("UPDATE est_fornecedor...");
-            $this->dbbonerp->update('est_fornecedor', $fornecedorBonERP, array(
-                'id' => $fornecedorBonERP_id
+            $this->dbcrosier->update('est_fornecedor', $fornecedorCrosier, array(
+                'id' => $fornecedorCrosier_id
             )) or $this->exit_db_error();
         } else {
-            $fornecedorBonERP['version'] = 0;
-            $fornecedorBonERP['inserted'] = date("Y-m-d H:i:s");
-            $fornecedorBonERP['estabelecimento_id'] = 1;
-            $fornecedorBonERP['user_inserted_id'] = 1;
-            $fornecedorBonERP['user_updated_id'] = 1;
+            $fornecedorCrosier['version'] = 0;
+            $fornecedorCrosier['inserted'] = date("Y-m-d H:i:s");
+            $fornecedorCrosier['estabelecimento_id'] = 1;
+            $fornecedorCrosier['user_inserted_id'] = 1;
+            $fornecedorCrosier['user_updated_id'] = 1;
             $this->logger->debug("INSERT na est_fornecedor... ");
-            $this->dbbonerp->insert('est_fornecedor', $fornecedorBonERP) or $this->exit_db_error();
-            $fornecedorBonERP_id = $this->dbbonerp->insert_id();
-            $this->logger->debug($fornecedorBonERP_id);
+            $this->dbcrosier->insert('est_fornecedor', $fornecedorCrosier) or $this->exit_db_error();
+            $fornecedorCrosier_id = $this->dbcrosier->insert_id();
+            $this->logger->debug($fornecedorCrosier_id);
         }
         // Agora já pode setar novamente
-        $fornecedorBonERP['id'] = $fornecedorBonERP_id;
+        $fornecedorCrosier['id'] = $fornecedorCrosier_id;
         
-        $this->salvarNaDePara($fornecedorBonERP, $fornecedorEkt);
+        $this->salvarNaDePara($fornecedorCrosier, $fornecedorEkt);
         
         $enderecoId = null;
         if ($atualizando) {
             // Pesquisa todos os endereços do fornecedor
             $sql = "SELECT e.* FROM bse_pessoa_endereco e, bse_pessoa p, est_fornecedor f WHERE p.id = e.pessoa_id AND f.pessoa_id = p.id AND f.id = ?";
             $params = array(
-                $fornecedorBonERP_id
+                $fornecedorCrosier_id
             );
-            $query = $this->dbbonerp->query($sql, $params) or $this->exit_db_error();
+            $query = $this->dbcrosier->query($sql, $params) or $this->exit_db_error();
             $enderecos = $query->result_array();
             $enderecoId = null;
             if ($enderecos) {
@@ -275,7 +275,7 @@ class ImportarFornecedores extends CI_Controller
         $endereco['updated'] = date("Y-m-d H:i:s");
         
         if ($enderecoId) {
-            $this->dbbonerp->update('bse_pessoa_endereco', $endereco, array(
+            $this->dbcrosier->update('bse_pessoa_endereco', $endereco, array(
                 'id' => $enderecoId
             )) or $this->exit_db_error();
         } else {
@@ -285,9 +285,9 @@ class ImportarFornecedores extends CI_Controller
             $endereco['user_inserted_id'] = 1;
             $endereco['user_updated_id'] = 1;
             
-            $this->dbbonerp->insert('bse_pessoa_endereco', $endereco) or $this->exit_db_error();
+            $this->dbcrosier->insert('bse_pessoa_endereco', $endereco) or $this->exit_db_error();
             
-            $enderecoId = $this->dbbonerp->insert_id();
+            $enderecoId = $this->dbcrosier->insert_id();
         }
 
 
@@ -296,14 +296,14 @@ class ImportarFornecedores extends CI_Controller
     /**
      *
      * @param
-     *            $fornecedorBonERP
+     *            $fornecedorCrosier
      * @param
      *            $fornecedorEkt
      */
-    private function salvarNaDePara($fornecedorBonERP, $fornecedorEkt)
+    private function salvarNaDePara($fornecedorCrosier, $fornecedorEkt)
     {
         $corrigiu_algo_aqui = false;
-        $fornecedorId = $fornecedorBonERP['id'];
+        $fornecedorId = $fornecedorCrosier['id'];
         $this->logger->debug("LIDANDO COM 'depara' [$fornecedorId]...");
         
         $sql = "SELECT * FROM est_fornecedor_codektmesano WHERE fornecedor_id = ? AND mesano = ? AND codigo_ekt = ?";
@@ -312,7 +312,7 @@ class ImportarFornecedores extends CI_Controller
             $this->mesano,
             $fornecedorEkt['CODIGO']
         );
-        $r = $this->dbbonerp->query($sql, $params)->result_array();
+        $r = $this->dbcrosier->query($sql, $params)->result_array();
         
         // Se ainda não tem na est_fornecedor_codektmesano, insere...
         if (count($r) == 0) {
@@ -320,19 +320,19 @@ class ImportarFornecedores extends CI_Controller
             $codektmesano['mesano'] = $this->mesano;
             $codektmesano['codigo_ekt'] = $fornecedorEkt['CODIGO'];
             
-            $this->dbbonerp->insert('est_fornecedor_codektmesano', $codektmesano) or $this->exit_db_error("Erro ao inserir na depara. fornecedor id [" . $fornecedorId . "]");
+            $this->dbcrosier->insert('est_fornecedor_codektmesano', $codektmesano) or $this->exit_db_error("Erro ao inserir na depara. fornecedor id [" . $fornecedorId . "]");
             $corrigiu_algo_aqui = true;
         }
         
         // verifica se o mesano é menor que o codigo_ekt_desde
         // se for, seta o codigo_ekt_desde pro mesano
-        if (array_key_exists('codigo_ekt_desde', $fornecedorBonERP) and $fornecedorBonERP['codigo_ekt_desde']) {
-            $dt_cod_ekt_desde = DateTime::createFromFormat('Y-m-d', $fornecedorBonERP['codigo_ekt_desde']);
+        if (array_key_exists('codigo_ekt_desde', $fornecedorCrosier) and $fornecedorCrosier['codigo_ekt_desde']) {
+            $dt_cod_ekt_desde = DateTime::createFromFormat('Y-m-d', $fornecedorCrosier['codigo_ekt_desde']);
             $dt_cod_ekt_desde->setTime(0, 0, 0, 0);
             if ($this->dtMesano < $dt_cod_ekt_desde) {
-                $fornecedorBonERP['codigo_ekt_desde'] = $this->dtMesano->format('Y-m-d');
-                $this->dbbonerp->update('est_fornecedor', $fornecedorBonERP, array(
-                    'id' => $fornecedorBonERP['id']
+                $fornecedorCrosier['codigo_ekt_desde'] = $this->dtMesano->format('Y-m-d');
+                $this->dbcrosier->update('est_fornecedor', $fornecedorCrosier, array(
+                    'id' => $fornecedorCrosier['id']
                 )) or $this->exit_db_error("Erro ao atualizar 'codigo_ekt_desde'");
                 $corrigiu_algo_aqui = true;
             }
@@ -340,13 +340,13 @@ class ImportarFornecedores extends CI_Controller
         
         // verifica se o mesano é maior que o codigo_ekt_ate
         // se for, seta o codigo_ekt_ate pro mesano
-        if (array_key_exists('codigo_ekt_ate', $fornecedorBonERP) and $fornecedorBonERP['codigo_ekt_ate']) {
-            $dt_cod_ekt_ate = DateTime::createFromFormat('Y-m-d', $fornecedorBonERP['codigo_ekt_ate']);
+        if (array_key_exists('codigo_ekt_ate', $fornecedorCrosier) and $fornecedorCrosier['codigo_ekt_ate']) {
+            $dt_cod_ekt_ate = DateTime::createFromFormat('Y-m-d', $fornecedorCrosier['codigo_ekt_ate']);
             $dt_cod_ekt_ate->setTime(0, 0, 0, 0);
             if ($this->dtMesano > $dt_cod_ekt_ate) {
-                $fornecedorBonERP['codigo_ekt_ate'] = $this->dtMesano->format('Y-m-d');
-                $this->dbbonerp->update('est_fornecedor', $fornecedorBonERP, array(
-                    'id' => $fornecedorBonERP['id']
+                $fornecedorCrosier['codigo_ekt_ate'] = $this->dtMesano->format('Y-m-d');
+                $this->dbcrosier->update('est_fornecedor', $fornecedorCrosier, array(
+                    'id' => $fornecedorCrosier['id']
                 )) or $this->exit_db_error("Erro ao atualizar 'codigo_ekt_ate'");
                 $corrigiu_algo_aqui = true;
             }
@@ -359,7 +359,7 @@ class ImportarFornecedores extends CI_Controller
 
     private function findNovoCodigo($codigoEkt)
     {
-        $query = $this->dbbonerp->get_where('est_fornecedor', array(
+        $query = $this->dbcrosier->get_where('est_fornecedor', array(
             'codigo' => $codigoEkt
         )) or $this->exit_db_error();
         if (count($query->result_array()) == 0) {
@@ -371,7 +371,7 @@ class ImportarFornecedores extends CI_Controller
         while (true) {
             $prefix = rand(1, 99999);
             $codigoStr = str_pad($prefix, 5, "9", STR_PAD_LEFT) . "0" . $codigoEkt;
-            $query = $this->dbbonerp->get_where('est_fornecedor', array(
+            $query = $this->dbcrosier->get_where('est_fornecedor', array(
                 'codigo' => $codigoStr
             )) or $this->exit_db_error("Erro ao buscar código randômico.");
             $existe = $query->result_array();
@@ -385,20 +385,20 @@ class ImportarFornecedores extends CI_Controller
      * Verifica se é o mesmo fornecedor comparando os nomes fantasias.
      *
      * @param
-     *            $fornecedorBonERP
+     *            $fornecedorCrosier
      * @param
      *            $fornecedorEkt
      * @return boolean
      */
-    private function checkMesmoNomeFantasia($fornecedorBonERP, $fornecedorEkt)
+    private function checkMesmoNomeFantasia($fornecedorCrosier, $fornecedorEkt)
     {
-        $nomeFantasiaBonERP = preg_replace("[^A-Za-z]", "", $fornecedorBonERP['nome_fantasia']);
+        $nomeFantasiaCrosier = preg_replace("[^A-Za-z]", "", $fornecedorCrosier['nome_fantasia']);
         $nomeFantasiaEkt = preg_replace("[^A-Za-z]", "", $fornecedorEkt['NOME_FANTASIA']);
         
-        if (strcasecmp($nomeFantasiaBonERP, $nomeFantasiaEkt) == 0) {
+        if (strcasecmp($nomeFantasiaCrosier, $nomeFantasiaEkt) == 0) {
             return true;
         } else {
-            if ((strpos($nomeFantasiaBonERP, $nomeFantasiaEkt) !== false) || (strpos($nomeFantasiaEkt, $nomeFantasiaBonERP) !== false)) {
+            if ((strpos($nomeFantasiaCrosier, $nomeFantasiaEkt) !== false) || (strpos($nomeFantasiaEkt, $nomeFantasiaCrosier) !== false)) {
                 return true;
             }
             return false;
@@ -410,7 +410,7 @@ class ImportarFornecedores extends CI_Controller
     public function setar_codigos_ekt()
     {
         $time_start = microtime(true);
-        $this->dbbonerp->trans_start();
+        $this->dbcrosier->trans_start();
         
         $logPath = getenv('EKT_LOG_PATH') or die("EKT_LOG_PATH não informado\n\n\n");
         $prefix = "ImportarFornecedores.setar_codigos_ekt._";
@@ -435,7 +435,7 @@ class ImportarFornecedores extends CI_Controller
                 continue;
             }
             
-            $query = $this->dbbonerp->query("SELECT * FROM vw_est_fornecedor WHERE REPLACE(nome_fantasia,' ','') LIKE ? AND tipo = 'ESTOQUE'", array(
+            $query = $this->dbcrosier->query("SELECT * FROM vw_est_fornecedor WHERE REPLACE(nome_fantasia,' ','') LIKE ? AND tipo = 'ESTOQUE'", array(
                 $nome
             )) or $this->exit_db_error();
             $r = $query->result_array();
@@ -448,10 +448,10 @@ class ImportarFornecedores extends CI_Controller
             } else {
                 if (count($r) == 1) {
                     $this->logger->info("Somente um encontrado.");
-                    $fornecedorBonERP = $r[0];
+                    $fornecedorCrosier = $r[0];
                     $this->logger->info("OK!");
                     $this->logger->info("Salvando na depara...");
-                    $this->salvarNaDePara($fornecedorBonERP, $fornecedorEkt);
+                    $this->salvarNaDePara($fornecedorCrosier, $fornecedorEkt);
                     $this->logger->info("OK.");
                 } else {
                     $this->logger->info("NENHUM ENCONTRADO... salvando...");
@@ -462,7 +462,7 @@ class ImportarFornecedores extends CI_Controller
         
         $this->logger->info("FINALIZANDO.");
         
-        $this->dbbonerp->trans_complete();
+        $this->dbcrosier->trans_complete();
         
         $time_end = microtime(true);
         $execution_time = ($time_end - $time_start);
@@ -475,8 +475,8 @@ class ImportarFornecedores extends CI_Controller
     {
         $this->logger->info(str_pad("", 100, "*"));
         $this->logger->info($msg ? $msg : '');
-        $this->logger->info("LAST QUERY: " . $this->dbbonerp->last_query());
-        print_r($this->dbbonerp->error());
+        $this->logger->info("LAST QUERY: " . $this->dbcrosier->last_query());
+        print_r($this->dbcrosier->error());
         $this->logger->info(str_pad("", 100, "*"));
         exit();
     }

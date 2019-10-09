@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Gerador de código fonte para entidades do Doctrine a partir das tabelas da bonerp.
+ * Gerador de código fonte para entidades do Doctrine a partir das tabelas da crosier.
  * 
  * @author Carlos Eduardo Pauluk
  *
@@ -15,7 +15,7 @@ class Doctrine extends CI_Controller
         ini_set('max_execution_time', 0);
         ini_set('memory_limit', '2048M');
         
-        $this->dbbonerp = $this->load->database('bonerp', TRUE);
+        $this->dbcrosier = $this->load->database('crosier', TRUE);
         
         $this->load->library('datetime_library');
         error_reporting(E_ALL);
@@ -27,7 +27,7 @@ class Doctrine extends CI_Controller
 
     public function generateDoctrineEntity($table)
     {
-        $r = $this->dbbonerp->query("DESC " . $table)->result_array();
+        $r = $this->dbcrosier->query("DESC " . $table)->result_array();
         $i = 0;
         $g = 0;
         $nGerados = "";

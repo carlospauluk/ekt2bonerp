@@ -2,17 +2,17 @@
 require_once ('./application/libraries/file/LogWriter.php');
 
 /**
- * Job que realiza a importação dos dados de vendas da base ekt para a base bonerp.
- * bonerp
+ * Job que realiza a importação dos dados de vendas da base ekt para a base crosier.
+ * crosier
  *
  * Para rodar, pela linha de comando, chamar com:
  *
  *
  * set EKT_CSVS_PATH=\\10.1.1.100\export
- * set EKT_LOG_PATH=C:\ekt2bonerp\log
+ * set EKT_LOG_PATH=C:\ekt2crosier\log
  *
  * export EKT_CSVS_PATH=/mnt/10.1.1.100-export
- * export EKT_LOG_PATH=~/dev/github/ekt2bonerp/log
+ * export EKT_LOG_PATH=~/dev/github/ekt2crosier/log
  *
  * php index.php jobs/ekt/ImportarEkt2Espelhos importar YYYYMM FOR-PROD-...
  */
@@ -45,9 +45,9 @@ class ImportarVendas extends CI_Controller
 
     private $totalVendasEkt_semautorizadas = 0.0;
 
-    private $totalVendasBonerp = 0.0;
+    private $totalVendasCrosier = 0.0;
 
-    private $totalVendasBonerp_semautorizadas = 0.0;
+    private $totalVendasCrosier_semautorizadas = 0.0;
 
     /**
      * Conexão ao db ekt.
@@ -55,9 +55,9 @@ class ImportarVendas extends CI_Controller
     private $dbekt;
 
     /**
-     * Conexão ao db bonerp.
+     * Conexão ao db crosier.
      */
-    private $dbbonerp;
+    private $dbcrosier;
 
     public function __construct()
     {
@@ -66,7 +66,7 @@ class ImportarVendas extends CI_Controller
         ini_set('memory_limit', '2048M');
         
         $this->dbekt = $this->load->database('ekt', TRUE);
-        $this->dbbonerp = $this->load->database('bonerp', TRUE);
+        $this->dbcrosier = $this->load->database('crosier', TRUE);
         
         $this->load->library('datetime_library');
         error_reporting(E_ALL);
@@ -75,22 +75,22 @@ class ImportarVendas extends CI_Controller
         $this->agora = new DateTime();
         
         $this->load->model('est/produto_model');
-        $this->produto_model->setDb($this->dbbonerp);
+        $this->produto_model->setDb($this->dbcrosier);
         
-        $this->venda_model = new \CIBases\Models\DAO\Base\Base_model('ven_venda', 'bonerp');
-        $this->venda_model->setDb($this->dbbonerp);
+        $this->venda_model = new \CIBases\Models\DAO\Base\Base_model('ven_venda', 'crosier');
+        $this->venda_model->setDb($this->dbcrosier);
         
-        $this->vendaitem_model = new \CIBases\Models\DAO\Base\Base_model('ven_venda_item', 'bonerp');
-        $this->vendaitem_model->setDb($this->dbbonerp);
+        $this->vendaitem_model = new \CIBases\Models\DAO\Base\Base_model('ven_venda_item', 'crosier');
+        $this->vendaitem_model->setDb($this->dbcrosier);
         
         $this->ektvenda_model = new \CIBases\Models\DAO\Base\Base_model('ekt_venda', 'ekt');
         $this->ektvenda_model->setDb($this->dbekt);
         
-        $this->pessoa_model = new \CIBases\Models\DAO\Base\Base_model('bse_pessoa', 'bonerp');
-        $this->pessoa_model->setDb($this->dbbonerp);
+        $this->pessoa_model = new \CIBases\Models\DAO\Base\Base_model('bse_pessoa', 'crosier');
+        $this->pessoa_model->setDb($this->dbcrosier);
         
-        $this->funcionario_model = new \CIBases\Models\DAO\Base\Base_model('rh_funcionario', 'bonerp');
-        $this->funcionario_model->setDb($this->dbbonerp);
+        $this->funcionario_model = new \CIBases\Models\DAO\Base\Base_model('rh_funcionario', 'crosier');
+        $this->funcionario_model->setDb($this->dbcrosier);
     }
 
     /**
@@ -108,7 +108,7 @@ class ImportarVendas extends CI_Controller
         $logPath = getenv('EKT_LOG_PATH') or die("EKT_LOG_PATH não informado" . PHP_EOL . PHP_EOL);
         $prefix = "ImportarVendas" . '_' . $mesano . '_' . "_";
         $this->logger = new LogWriter($logPath, $prefix);
-        $this->logger->setLevel(getenv('ekt2bonerp_log_level') ? getenv('ekt2bonerp_log_level') : 'INFO');
+        $this->logger->setLevel(getenv('ekt2crosier_log_level') ? getenv('ekt2crosier_log_level') : 'INFO');
         
         $this->logger->info("Iniciando a importação para o mês/ano: [" . $mesano . "]");
         $this->mesano = $mesano;
@@ -153,7 +153,7 @@ class ImportarVendas extends CI_Controller
     private function importarVendas()
     {
         $this->logger->info("Iniciando a importação de vendas...");
-        $this->dbbonerp->trans_start();
+        $this->dbcrosier->trans_start();
         
         $this->importarVendedores();
         
@@ -174,14 +174,14 @@ class ImportarVendas extends CI_Controller
         
         $this->logger->info("Finalizando... commitando a transação...");
         
-        $this->dbbonerp->trans_complete();
+        $this->dbcrosier->trans_complete();
         
         $this->logger->info(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> TOTAL VENDAS EKT: " . $this->totalVendasEkt);
         $this->logger->info(">>>>>>>>>>>>>>>>>>>>>>>>>>>> TOTAL VENDAS EKT (SEM AUTORIZADAS): " . $this->totalVendasEkt_semautorizadas);
         $valorConf = round($this->totalVendasEkt - $this->totalVendasEkt_semautorizadas, 2);
         $this->logger->info(">>>>>>>>>>>>>>>>>>>>>>>>>>>>> VALOR QUE DEVE ESTAR NO RELATÓRIO: " . $valorConf);
         
-        $regConf = $this->dbbonerp->query("SELECT valor FROM fin_reg_conf WHERE DATE_FORMAT(dt_registro, '%Y%m') = ? AND descricao = 'TOTAL VENDAS (IMPORTADO)'", array(
+        $regConf = $this->dbcrosier->query("SELECT valor FROM fin_reg_conf WHERE DATE_FORMAT(dt_registro, '%Y%m') = ? AND descricao = 'TOTAL VENDAS (IMPORTADO)'", array(
             $this->mesano
         ))->result_array();
         
@@ -193,10 +193,10 @@ class ImportarVendas extends CI_Controller
         }
         
         $this->logger->info("");
-        $this->logger->info(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> TOTAL VENDAS BONERP: " . $this->totalVendasBonerp);
-        $this->logger->info(">>>>>>>>>>>>>>>>>>>>>>>>> TOTAL VENDAS BONERP (SEM AUTORIZADAS): " . $this->totalVendasBonerp_semautorizadas);
+        $this->logger->info(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> TOTAL VENDAS CROSIER: " . $this->totalVendasCrosier);
+        $this->logger->info(">>>>>>>>>>>>>>>>>>>>>>>>> TOTAL VENDAS CROSIER (SEM AUTORIZADAS): " . $this->totalVendasCrosier_semautorizadas);
         
-        $this->logger->info(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> DIFERENÇA: " . ($this->totalVendasBonerp - $this->totalVendasEkt));
+        $this->logger->info(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> DIFERENÇA: " . ($this->totalVendasCrosier - $this->totalVendasEkt));
         
         $this->logger->info(PHP_EOL . PHP_EOL);
         $this->logger->info("--------------------------------------------------------------");
@@ -226,7 +226,7 @@ class ImportarVendas extends CI_Controller
             $codigo = trim($ektVendedor['CODIGO']);
             if ($codigo == 99)
                 continue;
-            $vendedor = $this->dbbonerp->query("SELECT 1 FROM rh_funcionario WHERE nome_ekt = ? AND codigo = ?", array(
+            $vendedor = $this->dbcrosier->query("SELECT 1 FROM rh_funcionario WHERE nome_ekt = ? AND codigo = ?", array(
                 $nomeEkt,
                 $codigo
             ))->result_array();
@@ -259,7 +259,7 @@ class ImportarVendas extends CI_Controller
         
         $this->logger->debug(PHP_EOL . ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Importando venda PV = [" . $ektVenda['NUMERO'] . "] em =[" . $ektVenda['EMISSAO'] . "]");
         
-        $vendas = $this->dbbonerp->query("SELECT * FROM ven_venda WHERE pv = ? AND dt_venda = ?", $params)->result_array();
+        $vendas = $this->dbcrosier->query("SELECT * FROM ven_venda WHERE pv = ? AND dt_venda = ?", $params)->result_array();
         $q = count($vendas);
         
         if ($q > 1) {
@@ -293,7 +293,7 @@ class ImportarVendas extends CI_Controller
 
     private function deletarItens($venda)
     {
-        if (! $this->dbbonerp->query("DELETE FROM ven_venda_item WHERE venda_id = ?", array(
+        if (! $this->dbcrosier->query("DELETE FROM ven_venda_item WHERE venda_id = ?", array(
             $venda['id']
         ))) {
             $this->logger->info("Erro ao deletar itens da venda_id = [" . $venda['id'] . "]");
@@ -401,7 +401,7 @@ class ImportarVendas extends CI_Controller
                     $itemVenda['preco_venda']
                 );
                 
-                $precos = $this->dbbonerp->query("SELECT * FROM est_produto_preco WHERE produto_id = ? AND (preco_prazo = ? OR preco_promo = ?)", $params)->result_array();
+                $precos = $this->dbcrosier->query("SELECT * FROM est_produto_preco WHERE produto_id = ? AND (preco_prazo = ? OR preco_promo = ?)", $params)->result_array();
                 
                 if (count($precos) > 0) {
                     $itemVenda['alteracao_preco'] = false;
@@ -453,8 +453,8 @@ class ImportarVendas extends CI_Controller
         if (! $venda['deletado']) {
             $this->totalVendasEkt += $totalVendaEKT;
             $this->totalVendasEkt_semautorizadas += $ektVenda['COND_PAG'] == '6.00' ? $totalVendaEKT : 0.0;
-            $this->totalVendasBonerp += $totalVendaCalculado;
-            $this->totalVendasBonerp_semautorizadas += $ektVenda['COND_PAG'] == '6.00' ? $totalVendaCalculado : 0.0;
+            $this->totalVendasCrosier += $totalVendaCalculado;
+            $this->totalVendasCrosier_semautorizadas += $ektVenda['COND_PAG'] == '6.00' ? $totalVendaCalculado : 0.0;
         }
         $this->logger->debug(">>>>>>>>>>>>>>>> VENDA SALVA");
     }
@@ -524,7 +524,7 @@ class ImportarVendas extends CI_Controller
     private function findPlanoPagto($condPag)
     {
         if (! $this->planosPagto) {
-            $r = $this->dbbonerp->query("SELECT id, codigo, descricao FROM ven_plano_pagto")->result_array();
+            $r = $this->dbcrosier->query("SELECT id, codigo, descricao FROM ven_plano_pagto")->result_array();
             if (! $r or count($r) < 1) {
                 $this->logger->info("Nenhum plano de pagto encontrado na base.");
                 exit();
@@ -562,7 +562,7 @@ class ImportarVendas extends CI_Controller
         
         if (! $this->vendedores) {
             
-            $r = $this->dbbonerp->query("SELECT id, codigo, nome_ekt FROM rh_funcionario")->result_array();
+            $r = $this->dbcrosier->query("SELECT id, codigo, nome_ekt FROM rh_funcionario")->result_array();
             if (count($r) < 1) {
                 $this->logger->info("Nenhum vendedor encontrado na base.");
                 return;
@@ -590,7 +590,7 @@ class ImportarVendas extends CI_Controller
         if (! $this->gradesTamanhos) {
             $this->gradesTamanhos = array();
             $sql = "SELECT gt.id, g.codigo, gt.tamanho FROM est_grade g, est_grade_tamanho gt WHERE gt.grade_id = g.id";
-            $r = $this->dbbonerp->query($sql)->result_array();
+            $r = $this->dbcrosier->query($sql)->result_array();
             foreach ($r as $gt) {
                 $_tamanho = trim($gt['tamanho']);
                 $this->gradesTamanhos[$gt['codigo']][$_tamanho] = $gt['id'];
@@ -614,7 +614,7 @@ class ImportarVendas extends CI_Controller
     {
         $this->logger->info("Marcando vendas deletadas para o mês/ano: [" . $this->mesano . "]");
         
-        $vendas = $this->dbbonerp->query("SELECT * FROM ven_venda WHERE deletado IS FALSE AND mesano = ?", array(
+        $vendas = $this->dbcrosier->query("SELECT * FROM ven_venda WHERE deletado IS FALSE AND mesano = ?", array(
             $this->mesano
         ))->result_array();
         
