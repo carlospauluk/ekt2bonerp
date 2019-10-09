@@ -116,7 +116,7 @@ class ImportarProdutos extends CI_Controller
     {
         $time_start = microtime(true);
 
-        $logPath = getenv('EKT_LOG_PATH') or die('EKT_LOG_PATH não informado');
+        $logPath = getenv('EKT_LOG_PATH') ?: './log/';
         $prefix = 'ImportarProdutos' . '_' . $mesano . '_' . $acao . '_';
         $this->logger = new LogWriter($logPath, $prefix);
 

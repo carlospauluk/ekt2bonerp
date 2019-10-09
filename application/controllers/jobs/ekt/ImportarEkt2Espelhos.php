@@ -60,7 +60,7 @@ class ImportarEkt2Espelhos extends CI_Controller
         ini_set('memory_limit', '2048M');
 
         $this->dbekt = $this->load->database('ekt', TRUE);
-        
+
         $this->load->library('datetime_library');
         error_reporting(E_ALL);
         ini_set('display_errors', 1);
