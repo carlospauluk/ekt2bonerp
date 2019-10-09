@@ -513,12 +513,6 @@ class ImportarVendas extends CI_Controller
         exit();
     }
 
-    public function teste($mesano)
-    {
-        $results = $this->findByReduzidoEkt(1234, '201702');
-        print_r($results);
-    }
-
     private $planosPagto;
 
     private function findPlanoPagto($condPag)

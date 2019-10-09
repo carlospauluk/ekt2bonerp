@@ -175,12 +175,6 @@ class CorrigirVendas extends CI_Controller
         echo "\n\n\n\n----------------------------------\nTotal Execution Time: " . $execution_time . "s";
     }
 
-    public function teste($mesano)
-    {
-        $results = $this->findByReduzidoEkt(1234, '201702');
-        print_r($results);
-    }
-
     public function cadeiaUnqcs()
     {
 
