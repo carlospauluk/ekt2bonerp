@@ -39,7 +39,7 @@ class Produto_model extends CIBases\Models\DAO\Base\Base_model
      */
     public function findByReduzidoEktAndMesano($reduzidoEkt, $mesano)
     {
-        $sql = "SELECT p.* FROM est_produto_reduzidoektmesano r, est_produto p WHERE p.id = r.produto_id AND r.codigo_from = ? AND r.mesano = ?";
+        $sql = "SELECT p.* FROM est_produto_reduzidoektmesano r, est_produto p WHERE p.id = r.produto_id AND r.reduzido_ekt = ? AND r.mesano = ?";
 
         $params = [
             $reduzidoEkt,

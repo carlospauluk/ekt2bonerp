@@ -30,17 +30,17 @@ class ImportarProdutos extends CI_Controller
     private $mesano;
 
     /**
-     * Se o $mesano = now
-     * @var
-     */
-    private $importandoMesCorrente;
-
-    /**
      * Parseado do $mesano para um DateTime.
      *
      * @var DateTime
      */
     private $dtMesano;
+
+    /**
+     * Se o $mesano = now
+     * @var
+     */
+    private $importandoMesCorrente;
 
     private $inseridos;
 
@@ -964,7 +964,7 @@ class ImportarProdutos extends CI_Controller
     }
 
 
-    private static $grades = [
+    public static $grades = [
         1 => [
             'uuid' => '750d27dd-7e1f-4fa2-91de-3433bafd4ac6', 'posicoes' => 7
         ],
