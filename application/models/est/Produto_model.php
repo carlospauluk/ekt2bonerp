@@ -20,14 +20,12 @@ class Produto_model extends CIBases\Models\DAO\Base\Base_model
      */
     public function findByReduzidoEkt($reduzidoEkt)
     {
-        $sql = "SELECT * FROM est_produto WHERE codigo_from = ? ";
+        $sql = "SELECT * FROM est_produto WHERE codigo_from = ? ORDER BY inserted";
         $params = [
             $reduzidoEkt
         ];
-
-        $sql .= "ORDER BY reduzido_ekt_desde";
+        /** @var CI_DB_mysqli_result $qry */
         $qry = $this->db->query($sql, $params);
-
         $r = $qry->result_array();
         return $r;
     }

@@ -7,16 +7,7 @@ require_once('./application/libraries/util/Datetime_utils.php');
 /**
  * Classe responsável por importar produtos das tabelas espelho (ekt_*) para o crosier.
  *
- * Para rodar:
- *
- * Pela linha de comando, chamar com:
- *
- *
- * IMPORTAR PRODUTOS:
  * php index.php jobs/est/ImportarProdutos importar PROD YYYYMM
- *
- * CORRIGIR PREÇOS
- * php index.php jobs/est/ImportarProdutos importar PRECOS
  *
  * @author Carlos Eduardo Pauluk
  *
@@ -69,6 +60,8 @@ class ImportarProdutos extends CI_Controller
 
     private $unidades;
 
+    private $atributos;
+
 
     /**
      * @var \CIBases\Models\DAO\Base\Base_model
@@ -98,7 +91,7 @@ class ImportarProdutos extends CI_Controller
     /**
      * @var \CIBases\Models\DAO\Base\Base_model
      */
-    public $produtosaldoatributo_model;
+    public $produtoatributo_model;
 
 
     /**
@@ -135,8 +128,8 @@ class ImportarProdutos extends CI_Controller
         $this->produtosaldo_model = new \CIBases\Models\DAO\Base\Base_model('est_produto_saldo', 'crosier');
         $this->produtosaldo_model->setDb($this->dbcrosier);
 
-        $this->produtosaldoatributo_model = new \CIBases\Models\DAO\Base\Base_model('est_produto_saldo_atributo', 'crosier');
-        $this->produtosaldoatributo_model->setDb($this->dbcrosier);
+        $this->produtoatributo_model = new \CIBases\Models\DAO\Base\Base_model('est_produto_atributo', 'crosier');
+        $this->produtoatributo_model->setDb($this->dbcrosier);
     }
 
     /**
@@ -174,7 +167,7 @@ class ImportarProdutos extends CI_Controller
             $this->dtMesano->setTime(0, 0, 0, 0);
             $this->deletarSaldos();
             $this->importarProdutos();
-            // $this->gerarProdutoSaldoHistorico();
+            $this->gerarProdutoSaldoHistorico();
 
             if ($this->importandoMesCorrente) {
                 // Se está importando para o mês corrente, corrige os campos reduzido_ekt_ate
@@ -188,13 +181,11 @@ class ImportarProdutos extends CI_Controller
             $this->corrigirCampoAtual(); // acerta o campo est_produto.atual
         }
         if ($acao === 'DESDES_ATES') {
-            $this->corrigeReduzidoEktDesdeAte(); // corrige apenas os campos reduzido_ekt_desde e reduzido_ekt_ate
+            $this->corrigeReduzidoEktDesdeAte(); // corrige apenas os atributos reduzido_ekt_desde e reduzido_ekt_ate
         }
         if ($acao === 'PRECOS') {
             $this->corrigirPrecos();
         }
-
-        $this->conferencias();
 
         $time_end = microtime(true);
         $execution_time = ($time_end - $time_start);
@@ -206,21 +197,14 @@ class ImportarProdutos extends CI_Controller
     }
 
     /**
-     * @param null $estProdutoId
      */
-    private function deletarSaldos($estProdutoId = null): void
+    private function deletarSaldos(): void
     {
-        $sql = 'DELETE FROM est_produto_reduzidoektmesano WHERE mesano = ?';
-        if ($estProdutoId) {
-            $sql .= ' AND produto_id = ' . $estProdutoId;
-        }
-        $this->dbcrosier->query($sql, [$this->mesano]);
-
-        $sql = 'TRUNCATE TABLE est_produto_saldo';
-        if ($estProdutoId) {
-            $sql = 'DELETE FROM est_produto_saldo WHERE produto_id = ' . $estProdutoId;
-        }
-        $this->dbcrosier->query($sql) or $this->exit_db_error("Erro ao $sql");
+        $this->dbcrosier->query('DELETE FROM est_produto_reduzidoektmesano WHERE mesano = ?', [$this->mesano]);
+        $this->dbcrosier->query('SET FOREIGN_KEY_CHECKS = 0') or $this->exit_db_error('Erro ao SET FOREIGN_KEY_CHECKS = 0');
+        $this->dbcrosier->query('TRUNCATE TABLE est_produto_saldo_atributo') or $this->exit_db_error('Erro ao TRUNCATE TABLE est_produto_saldo_atributo');
+        $this->dbcrosier->query('TRUNCATE TABLE est_produto_saldo') or $this->exit_db_error('Erro ao TRUNCATE TABLE est_produto_saldo');
+        $this->dbcrosier->query('SET FOREIGN_KEY_CHECKS = 1') or $this->exit_db_error('Erro ao SET FOREIGN_KEY_CHECKS = 1');
     }
 
     /**
@@ -292,9 +276,9 @@ class ImportarProdutos extends CI_Controller
             foreach ($produtosComMesmoReduzidoEKT as $mesmoReduzido) {
 
                 $descricao_ekt = trim($ektProduto['DESCRICAO']);
-                $descricao = trim($mesmoReduzido['nome']);
+                $nome = trim($mesmoReduzido['nome']);
 
-                if ($descricao_ekt === $descricao) {
+                if ($descricao_ekt === $nome) {
                     // PRODUTO JÁ EXISTENTE
                     $achouMesmo = true;
                     $this->saveProduto($ektProduto, $mesmoReduzido);
@@ -305,7 +289,7 @@ class ImportarProdutos extends CI_Controller
                     // conferindo se as qtdes na grade batem
                     $qtdeTotal_ektProduto = $this->getQtdeTotalEktProduto($ektProduto);
                     $qtdeTotal_produto = $this->getQtdeTotalProduto($mesmoReduzido);
-                    if ($qtdeTotal_ektProduto !== $qtdeTotal_produto) {
+                    if ((float)$qtdeTotal_ektProduto !== (float)$qtdeTotal_produto) {
                         $this->logger->info('Qtde diferem para produtoId=[' . $mesmoReduzido['id'] . '] Reduzido:[' . $ektProduto['REDUZIDO'] . ']');
                         return;
                     }
@@ -336,7 +320,7 @@ class ImportarProdutos extends CI_Controller
     {
         $produtoNovo = $produto === null;
 
-        $produto['subgrupo_id'] = $this->findSubgrupoBycodigo($ektProduto['SUBDEPTO']);
+        $produto['subgrupo_id'] = $this->findSubgrupoByCodigo($ektProduto['SUBDEPTO']);
         if (!$produto['subgrupo_id']) {
             throw new RuntimeException('Subgrupo (antigo subdepto) não encontrado [' . $ektProduto['SUBDEPTO'] . ']');
         }
@@ -348,15 +332,15 @@ class ImportarProdutos extends CI_Controller
         $produto['fornecedor_id'] = $fornecedor_id;
 
         $produto['nome'] = $ektProduto['DESCRICAO'];
-        $produtoAtributo['dt_ult_venda'] = $ektProduto['DATA_ULT_VENDA'];
+        $produtoAtributos['5e46a239-98e4-421f-8bff-bc947d2330f4'] = $ektProduto['DATA_ULT_VENDA'];
 
-        $produtoAtributo['grade'] = ImportarProdutos::$grades[$ektProduto['GRADE']];
-        if (!$produtoAtributo['grade']) {
+        $produtoAtributos['5c0bf6e4-cc24-4e95-a05c-730ca79e8330'] = ImportarProdutos::$grades[$ektProduto['GRADE']]['uuid'];
+        if (!$produtoAtributos['5c0bf6e4-cc24-4e95-a05c-730ca79e8330']) {
             throw new RuntimeException('Grade não encontrada [' . $ektProduto['GRADE'] . ']');
         }
 
         if ($produtoNovo) {
-            $produtoAtributo['reduzido'] = $this->handleReduzido($ektProduto);
+            $produtoAtributos['f1baa66b-c7ff-42f8-9554-d9fd3bf66123'] = $this->handleReduzido($ektProduto);
         }
 
         $produto['codigo_from'] = $ektProduto['REDUZIDO'];
@@ -372,6 +356,26 @@ class ImportarProdutos extends CI_Controller
 
         $produto['status'] = $this->importandoMesCorrente ? 'ATIVO' : 'INATIVO';
         $produto_id = $this->produto_model->save($produto);
+
+        foreach ($produtoAtributos as $uuid => $valor) {
+            $atributoId = $this->getAtributoByUUID($uuid);
+            $sqlAtributo = 'SELECT * FROM est_produto_atributo WHERE atributo_id = ? AND produto_id = ?';
+            $produtoAtributo = $this->dbcrosier->query($sqlAtributo, [$atributoId, $produto_id])->result_array();
+            if (!isset($produtoAtributo[0])) {
+                $produtoAtributo = [
+                    'produto_id' => $produto_id,
+                    'atributo_id' => $atributoId,
+                    'soma_preench' => 'S',
+                    'quantif' => 'N',
+                    'precif' => 'N',
+                ];
+            } else {
+                $produtoAtributo = $produtoAtributo[0];
+            }
+            $produtoAtributo['valor'] = $valor;
+            $this->produtoatributo_model->save($produtoAtributo);
+        }
+
         $produto['id'] = $produto_id;
 
         $this->salvarProdutoPreco($ektProduto, $produto_id, $this->mesano);
@@ -384,10 +388,10 @@ class ImportarProdutos extends CI_Controller
      * @param $codigo
      * @return mixed
      */
-    private function findSubgrupoBycodigo($codigo)
+    private function findSubgrupoByCodigo($codigo)
     {
         if (!$this->subgrupos) {
-            $this->subgrupos = array();
+            $this->subgrupos = [];
             $sql = 'SELECT id, codigo FROM est_subgrupo';
             $r = $this->dbcrosier->query($sql)->result_array();
             foreach ($r as $subdepto) {
@@ -467,14 +471,14 @@ class ImportarProdutos extends CI_Controller
             $produtoEkt['DATA_PVENDA'] = DateTime::createFromFormat('Ymd', $mesano . '01')->format('Y-m-d');
         }
 
-        $query = $this->dbcrosier->get_where('est_produto_preco', array(
+        $query = $this->dbcrosier->get_where('est_produto_preco', [
             'produto_id' => $produtoId,
             'dt_custo' => $produtoEkt['DATA_PCUSTO'],
             'dt_preco_venda' => $produtoEkt['DATA_PVENDA'],
             'preco_custo' => $produtoEkt['PCUSTO'],
             'preco_vista' => $produtoEkt['PVISTA'],
             'preco_prazo' => $produtoEkt['PPRAZO']
-        ));
+        ]);
         $existe = $query->result_array();
         if (count($existe) > 0) {
             return;
@@ -530,60 +534,65 @@ class ImportarProdutos extends CI_Controller
         // Em alguns casos tem qtdes em gradestamanho além da capacidade da grade.
         // Aí acumulo tudo e salvo junto numa posição de grade que realmente exista (faça sentido).
         $acumulado = 0.0;
-        if ($qtdeTamanhos < 12 and $ektProduto['QT12']) {
-            $acumulado += $ektProduto['QT12'];
+        $acumulado += ((float)$ektProduto['QT13'] !== 0.0) ? (float)$ektProduto['QT13'] : 0.0;
+        $acumulado += ((float)$ektProduto['QT14'] !== 0.0) ? (float)$ektProduto['QT14'] : 0.0;
+        $acumulado += ((float)$ektProduto['QT15'] !== 0.0) ? (float)$ektProduto['QT15'] : 0.0;
+        if ($qtdeTamanhos < 12 && (float)$ektProduto['QT12'] !== 0.0) {
+            $acumulado += (float)$ektProduto['QT12'];
             $ektProduto['QT12'] = null;
         }
-        if ($qtdeTamanhos < 11 and $ektProduto['QT11']) {
-            $acumulado += $ektProduto['QT11'];
+        if ($qtdeTamanhos < 11 && (float)$ektProduto['QT11'] !== 0.0) {
+            $acumulado += (float)$ektProduto['QT11'];
             $ektProduto['QT11'] = null;
         }
-        if ($qtdeTamanhos < 10 and $ektProduto['QT10']) {
-            $acumulado += $ektProduto['QT10'];
+        if ($qtdeTamanhos < 10 && (float)$ektProduto['QT10'] !== 0.0) {
+            $acumulado += (float)$ektProduto['QT10'];
             $ektProduto['QT10'] = null;
         }
-        if ($qtdeTamanhos < 9 and $ektProduto['QT09']) {
-            $acumulado += $ektProduto['QT09'];
+        if ($qtdeTamanhos < 9 && (float)$ektProduto['QT09'] !== 0.0) {
+            $acumulado += (float)$ektProduto['QT09'];
             $ektProduto['QT09'] = null;
         }
-        if ($qtdeTamanhos < 8 and $ektProduto['QT08']) {
-            $acumulado += $ektProduto['QT08'];
+        if ($qtdeTamanhos < 8 && (float)$ektProduto['QT08'] !== 0.0) {
+            $acumulado += (float)$ektProduto['QT08'];
             $ektProduto['QT08'] = null;
         }
-        if ($qtdeTamanhos < 7 and $ektProduto['QT07']) {
-            $acumulado += $ektProduto['QT07'];
+        if ($qtdeTamanhos < 7 && (float)$ektProduto['QT07'] !== 0.0) {
+            $acumulado += (float)$ektProduto['QT07'];
             $ektProduto['QT07'] = null;
         }
-        if ($qtdeTamanhos < 6 and $ektProduto['QT06']) {
-            $acumulado += $ektProduto['QT06'];
+        if ($qtdeTamanhos < 6 && (float)$ektProduto['QT06'] !== 0.0) {
+            $acumulado += (float)$ektProduto['QT06'];
             $ektProduto['QT06'] = null;
         }
-        if ($qtdeTamanhos < 5 and $ektProduto['QT05']) {
-            $acumulado += $ektProduto['QT05'];
+        if ($qtdeTamanhos < 5 && (float)$ektProduto['QT05'] !== 0.0) {
+            $acumulado += (float)$ektProduto['QT05'];
             $ektProduto['QT05'] = null;
         }
-        if ($qtdeTamanhos < 4 and $ektProduto['QT04']) {
-            $acumulado += $ektProduto['QT04'];
+        if ($qtdeTamanhos < 4 && (float)$ektProduto['QT04'] !== 0.0) {
+            $acumulado += (float)$ektProduto['QT04'];
             $ektProduto['QT04'] = null;
         }
-        if ($qtdeTamanhos < 3 and $ektProduto['QT03']) {
-            $acumulado += $ektProduto['QT03'];
+        if ($qtdeTamanhos < 3 && (float)$ektProduto['QT03'] !== 0.0) {
+            $acumulado += (float)$ektProduto['QT03'];
             $ektProduto['QT03'] = null;
         }
-        if ($qtdeTamanhos < 2 and $ektProduto['QT02']) {
-            $acumulado += $ektProduto['QT02'];
+        if ($qtdeTamanhos < 2 && (float)$ektProduto['QT02'] !== 0.0) {
+            $acumulado += (float)$ektProduto['QT02'];
             $ektProduto['QT02'] = null;
         }
 
-        if ($acumulado > 0) {
-            $this->logger->debug('Produto com qtdes em posições fora da grade. Acumulado: [' . $acumulado . ']');
-        }
-
         for ($i = 1; $i <= 12; $i++) {
-            if ($ektProduto['QT' . str_pad($i, 2, '0', STR_PAD_LEFT)] !== null) {
+            $qtde = (float)($ektProduto['QT' . str_pad($i, 2, '0', STR_PAD_LEFT)]);
+            if ($qtde) {
                 $this->saveProdutoSaldo($ektProduto, $produto, $i, $acumulado);
                 $acumulado = 0.0; // já salvou, não precisa mais
             }
+        }
+        if ($acumulado) {
+            $qtde = (float)($ektProduto['QT01']) ?: 0.0;
+            $qtde += $acumulado;
+            $this->saveProdutoSaldo($ektProduto, $produto, 1, $qtde);
         }
     }
 
@@ -600,7 +609,7 @@ class ImportarProdutos extends CI_Controller
     {
         $ordemStr = str_pad($ordem, 2, '0', STR_PAD_LEFT);
 
-        $qtde = (double)$ektProduto['QT' . $ordemStr];
+        $qtde = (float)$ektProduto['QT' . $ordemStr];
         $qtde += $acumulado;
 
         $qryGt = $this->dbcrosier->query('SELECT id FROM est_atributo WHERE atributo_pai_uuid = ? AND ordem = ?', [
@@ -622,7 +631,7 @@ class ImportarProdutos extends CI_Controller
         $produtoSaldoAtributo['produto_saldo_id'] = $produtoSaldoId;
         $produtoSaldoAtributo['atributo_id'] = $gt['id'];
 
-        $this->produtosaldoatributo_model->save($produtoSaldo) or $this->exit_db_error('Erro ao salvar na est_produto_saldo_atributo');
+        $this->dbcrosier->query('INSERT INTO est_produto_saldo_atributo(produto_saldo_id, atributo_id) VALUES(?,?)', $produtoSaldoAtributo);
     }
 
     /**
@@ -655,38 +664,53 @@ class ImportarProdutos extends CI_Controller
 
     /**
      * @param $ektProduto
-     * @return float
+     * @return null|float
      */
-    private function getQtdeTotalEktProduto($ektProduto)
+    private function getQtdeTotalEktProduto($ektProduto): ?float
     {
-        $qtdeTotal = ($ektProduto['QT01'] ? $ektProduto['QT01'] : 0.0) + ($ektProduto['QT02'] ? $ektProduto['QT02'] : 0.0) + ($ektProduto['QT03'] ? $ektProduto['QT03'] : 0.0) + ($ektProduto['QT04'] ? $ektProduto['QT04'] : 0.0) + ($ektProduto['QT05'] ? $ektProduto['QT05'] : 0.0) + ($ektProduto['QT06'] ? $ektProduto['QT06'] : 0.0) + ($ektProduto['QT07'] ? $ektProduto['QT07'] : 0.0) + ($ektProduto['QT08'] ? $ektProduto['QT08'] : 0.0) + ($ektProduto['QT09'] ? $ektProduto['QT09'] : 0.0) + ($ektProduto['QT10'] ? $ektProduto['QT10'] : 0.0) + ($ektProduto['QT11'] ? $ektProduto['QT11'] : 0.0) + ($ektProduto['QT12'] ? $ektProduto['QT12'] : 0.0);
+        $qtdeTotal =
+            ($ektProduto['QT01'] ?: 0.0) +
+            ($ektProduto['QT02'] ?: 0.0) +
+            ($ektProduto['QT03'] ?: 0.0) +
+            ($ektProduto['QT04'] ?: 0.0) +
+            ($ektProduto['QT05'] ?: 0.0) +
+            ($ektProduto['QT06'] ?: 0.0) +
+            ($ektProduto['QT07'] ?: 0.0) +
+            ($ektProduto['QT08'] ?: 0.0) +
+            ($ektProduto['QT09'] ?: 0.0) +
+            ($ektProduto['QT10'] ?: 0.0) +
+            ($ektProduto['QT11'] ?: 0.0) +
+            ($ektProduto['QT12'] ?: 0.0) +
+            ($ektProduto['QT13'] ?: 0.0) +
+            ($ektProduto['QT14'] ?: 0.0) +
+            ($ektProduto['QT15'] ?: 0.0);
 
-        return $qtdeTotal;
+        return (float)$qtdeTotal;
     }
 
     /**
      * @param $produto
-     * @return int|null
+     * @return float|null
      */
-    private function getQtdeTotalProduto($produto): ?int
+    private function getQtdeTotalProduto($produto): ?float
     {
         if (!$produto) {
             $this->logger->debug('PRODUTO === NULL ?????? ');
             return null;
         }
-        $qtdeTotal = 0;
+        $qtdeTotal = 0.0;
 
-        $saldos = $this->dbcrosier->query('SELECT qtde FROM est_produto_saldo WHERE produto_id = ?', array(
+        $saldos = $this->dbcrosier->query('SELECT qtde FROM est_produto_saldo WHERE produto_id = ?', [
             $produto['id']
-        ))->result_array();
+        ])->result_array();
 
         foreach ($saldos as $saldo) {
             if ($saldo['qtde']) {
-                $qtdeTotal += $saldo['qtde'];
+                $qtdeTotal += (float)$saldo['qtde'];
             }
         }
 
-        return $qtdeTotal;
+        return (float)$qtdeTotal;
     }
 
     /**
@@ -696,9 +720,14 @@ class ImportarProdutos extends CI_Controller
     private function corrigeReduzidoEktAteMesCorrente(): void
     {
         $this->logger->info('.................... CORRIGINDO reduzido_ekt_ate PARA IMPORTAÇÃO DE MÊS CORRENTE...');
-        $sql = 'SELECT produto_id FROM est_produto_reduzidoektmesano WHERE mesano = ? AND produto_id NOT IN (SELECT id FROM est_produto WHERE reduzido_ekt_ate IS NULL)';
+        // Pego todos os produtos que esteja com "reduzido_ekt_ate" = NULL mas que não estejam na lista dos produtos deste mês (ou seja, tiveram seu reduzido reutilizado neste mês por outro produto)
+        $sql = 'SELECT produto_id FROM est_produto_atributo WHERE atributo_id = ? AND (valor IS NULL OR valor = \'\') AND produto_id NOT IN (SELECT produto_id FROM est_produto_reduzidoektmesano WHERE mesano = ?)';
         // ou seja, não existe um registro na est_produto_reduzidoektmesano para o mês corrente para tal est_produto.id
-        $query = $this->dbcrosier->query($sql, [$this->agora->format('Ym')]);
+        $query = $this->dbcrosier->query($sql,
+            [
+                $this->getAtributoByUUID('06a32cc0-7cb0-4c58-9b4f-ca7776b7f8e3'), // reduzido_ekt_desde
+                $this->agora->format('Ym'),
+            ]);
         $result = $query->result_array();
         $total = count($result);
         $i = 1;
@@ -710,11 +739,13 @@ class ImportarProdutos extends CI_Controller
 
         foreach ($result as $r) {
             try {
-                $estProduto = $this->produto_model->findby_id($r['produto_id']);
-                $estProduto['reduzido_ekt_ate'] = $ultimoDiaMesAnterior;
-                $this->dbcrosier->update('est_produto', $estProduto, array(
-                    'id' => $estProduto['id']
-                )) or $this->exit_db_error("Erro ao atualizar 'reduzido_ekt_ate'");
+                $this->dbcrosier->update_string(
+                    'est_produto_atributo',
+                    ['valor' => $ultimoDiaMesAnterior],
+                    [
+                        'produto_id' => $r['produto_id'],
+                        'atributo_id' => $this->atributos['06a32cc0-7cb0-4c58-9b4f-ca7776b7f8e3']
+                    ]);
 
                 $this->logger->info(' ... ' .
                     str_pad($i++, 6, '0', STR_PAD_LEFT) . '/' . str_pad($total, 6, '0', STR_PAD_LEFT) .
@@ -735,8 +766,8 @@ class ImportarProdutos extends CI_Controller
     private function corrigirCampoAtual(): void
     {
         $mesanoAtual = (new DateTime())->format('Ym');
-        $this->dbcrosier->query('UPDATE est_produto SET atual = false');
-        $this->dbcrosier->query('UPDATE est_produto SET atual = true WHERE id IN (SELECT produto_id FROM est_produto_reduzidoektmesano WHERE mesano = ' . $mesanoAtual . ')');
+        $this->dbcrosier->query('UPDATE est_produto SET status = \'INATIVO\'');
+        $this->dbcrosier->query('UPDATE est_produto SET status = \'ATIVO\' WHERE id IN (SELECT produto_id FROM est_produto_reduzidoektmesano WHERE mesano = ' . $mesanoAtual . ')');
     }
 
     /**
@@ -774,10 +805,10 @@ class ImportarProdutos extends CI_Controller
                 try {
 
                     // Para cada ekt_produto, encontra o est_produto
-                    $query = $this->dbcrosier->query('SELECT * FROM est_produto WHERE reduzido_ekt = ? AND trim(descricao) LIKE ?', array(
+                    $query = $this->dbcrosier->query('SELECT * FROM est_produto WHERE codigo_from = ? AND trim(nome) LIKE ?', [
                         $r['REDUZIDO'],
                         trim($r['DESCRICAO'])
-                    ));
+                    ]);
                     $result = $query->result_array();
                     $qtde = count($result);
                     if ($qtde !== 1) {
@@ -805,11 +836,11 @@ class ImportarProdutos extends CI_Controller
     {
         $this->logger->info('Iniciando correção de reduzido_ekt_desde e reduzido_ekt_ate');
 
-        $this->logger->info('UPDATE est_produto SET reduzido_ekt_desde = NULL, reduzido_ekt_ate = NULL');
-        $this->dbcrosier->query('UPDATE est_produto SET reduzido_ekt_desde = NULL, reduzido_ekt_ate = NULL');
+        $this->dbcrosier->query('DELETE FROM est_produto_atributo WHERE atributo_id = \'fa0e7196-4b7f-4797-97ab-70615a72fcf0\'');
+        $this->dbcrosier->query('DELETE FROM est_produto_atributo WHERE atributo_id = \'06a32cc0-7cb0-4c58-9b4f-ca7776b7f8e3\'');
         $this->logger->info('OK');
 
-        $sql = "SELECT * FROM est_produto WHERE reduzido_ekt != 88888 AND TRIM(descricao) != ''";
+        $sql = "SELECT * FROM est_produto WHERE codigo_from != 88888 AND TRIM(nome) != ''";
         $rs = $this->dbcrosier->query($sql)->result_array();
 
         // Monto toda a tabela num array para não precisar executar um SELECT pra cada produto no foreach.
@@ -834,19 +865,33 @@ class ImportarProdutos extends CI_Controller
             $mesano_ini = $mesesanos[0];
             $mesano_fim = $mesesanos[count($mesesanos) - 1];
 
-            $estProduto_['reduzido_ekt_desde'] = (DateTime::createFromFormat('Ym', $mesano_ini))->format('Y-m-d');
-            $estProduto_['reduzido_ekt_ate'] = (DateTime::createFromFormat('Ym', $mesano_fim))->format('Y-m-t');
+            $atributoId = $this->getAtributoByUUID('fa0e7196-4b7f-4797-97ab-70615a72fcf0'); // reduzido_ekt_desde
+            $reduzidoEktDesde = [
+                'produto_id' => $estProduto['id'],
+                'atributo_id' => $atributoId,
+                'soma_preench' => 'S',
+                'quantif' => 'N',
+                'precif' => 'N',
+                'valor' => (DateTime::createFromFormat('Ym', $mesano_ini))->format('Y-m-d')
+            ];
+            $this->produtoatributo_model->save($reduzidoEktDesde);
 
-            $this->dbcrosier->update('est_produto', $estProduto_, array(
-                'id' => $estProduto['id']
-            )) or $this->exit_db_error("Erro ao atualizar 'reduzido_ekt_desde' e 'reduzido_ekt_ate'");
-
+            $atributoId = $this->getAtributoByUUID('06a32cc0-7cb0-4c58-9b4f-ca7776b7f8e3'); // reduzido_ekt_ate
+            $reduzidoEktAte = [
+                'produto_id' => $estProduto['id'],
+                'atributo_id' => $atributoId,
+                'soma_preench' => 'S',
+                'quantif' => 'N',
+                'precif' => 'N',
+                'valor' => (DateTime::createFromFormat('Ym', $mesano_fim))->format('Y-m-t')
+            ];
+            $this->produtoatributo_model->save($reduzidoEktAte);
 
             $this->logger->info(' ... ' . str_pad($estProduto['reduzido_ekt'], 6, 0, STR_PAD_LEFT) . ' ....................................................................... ' . str_pad($i++, 6, '0', STR_PAD_LEFT) . '/' . str_pad($total, 6, '0', STR_PAD_LEFT));
 
         }
         $mesano_atual = $this->agora->format('Ym');
-        $this->dbcrosier->query("UPDATE est_produto SET reduzido_ekt_ate = NULL WHERE DATE_FORMAT(reduzido_ekt_ate, '%Y%m') = ?", [$mesano_atual]);
+        $this->dbcrosier->query("UPDATE est_produto_atributo SET valor = NULL WHERE uuid = '06a32cc0-7cb0-4c58-9b4f-ca7776b7f8e3' AND DATE_FORMAT(valor, '%Y%m') = ?", [$mesano_atual]);
         $this->logger->info('OK');
     }
 
@@ -878,10 +923,10 @@ class ImportarProdutos extends CI_Controller
             foreach ($result as $r) {
                 try {
                     // Para cada ekt_produto, encontra o est_produto
-                    $query = $this->dbcrosier->query('SELECT * FROM est_produto WHERE reduzido_ekt = ? AND trim(descricao) LIKE ? ', array(
+                    $query = $this->dbcrosier->query('SELECT * FROM est_produto WHERE codigo_from = ? AND trim(nome) LIKE ? ', [
                         $r['REDUZIDO'],
                         trim($r['DESCRICAO'])
-                    ));
+                    ]);
                     $result = $query->result_array();
                     $qtde = count($result);
                     if ($qtde !== 1) {
@@ -906,31 +951,16 @@ class ImportarProdutos extends CI_Controller
     }
 
     /**
-     * Realiza conferências
+     * @param string $uuid
+     * @return mixed
      */
-    private function conferencias(): void
+    public function getAtributoByUUID(string $uuid)
     {
-        $this->logger->info('');
-        $this->logger->info('');
-        $this->logger->info('');
-        $this->logger->info('**********************************************************');
-        $this->logger->info('**********************************************************');
-        $this->logger->info('******************** CONFERÊNCIAS ************************');
-        $this->logger->info('**********************************************************');
-        $this->logger->info('**********************************************************');
-        $this->logger->info('');
-
-        $r = $this->dbcrosier->query("SELECT count(*) as qtde FROM est_produto WHERE reduzido_ekt != '88888' AND trim(descricao) != '' AND reduzido_ekt_desde IS NULL")->result_array();
-        $this->logger->info("Qtde est_produto.reduzido_ekt_desde = NULL : '" . (($r and isset($r['qtde'])) ? $r['qtde'] : '0') . "'");
-
-        $r = $this->dbcrosier->query("SELECT reduzido_ekt, count(*) as qtde FROM est_produto WHERE reduzido_ekt != '88888' AND trim(descricao) != '' AND reduzido_ekt_ate IS NULL GROUP BY reduzido_ekt HAVING qtde > 1")->result_array();
-        $this->logger->info("Duplicação de reduzido_ekt_ate = NULL      : '" . (($r and isset($r['qtde'])) ? $r['qtde'] : '0') . "'");
-
-        $this->logger->info('');
-        $this->logger->info('**********************************************************');
-        $this->logger->info('**********************************************************');
-        $this->logger->info('**********************************************************');
-
+        if (!isset($this->atributos[$uuid])) {
+            $r = $this->dbcrosier->query('SELECT * FROM est_atributo WHERE uuid = ?', [$uuid])->result_array() or die('Atributo não encontrado para uuid = "' . $uuid . '"');
+            $this->atributos[$uuid] = $r[0]['id'];
+        }
+        return $this->atributos[$uuid];
     }
 
 
