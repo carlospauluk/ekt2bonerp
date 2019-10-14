@@ -624,7 +624,6 @@ class ImportarProdutos extends CI_Controller
 
         $produtoSaldo['produto_id'] = $produto['id'];
         $produtoSaldo['qtde'] = $qtde;
-        $produtoSaldo['selec'] = $ektProduto['F' . $ordem] === 'S';
 
         $produtoSaldoId = $this->produtosaldo_model->save($produtoSaldo) or $this->exit_db_error('Erro ao salvar na est_produto_saldo para o produto id [' . $produto['id'] . ']');
 
