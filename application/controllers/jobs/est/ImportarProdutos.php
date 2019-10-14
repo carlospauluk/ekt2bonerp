@@ -167,7 +167,6 @@ class ImportarProdutos extends CI_Controller
             $this->dtMesano->setTime(0, 0, 0, 0);
             $this->deletarSaldos();
             $this->importarProdutos();
-            $this->gerarProdutoSaldoHistorico();
 
             if ($this->importandoMesCorrente) {
                 // Se está importando para o mês corrente, corrige os campos reduzido_ekt_ate
