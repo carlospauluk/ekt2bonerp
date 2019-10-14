@@ -505,7 +505,6 @@ class ImportarProdutos extends CI_Controller
             'user_updated_id' => 1,
             'produto_id' => $produtoId,
             'custo_financeiro' => 0.15,
-            'mesano' => $dtMesano
         ];
 
         $this->dbcrosier->insert('est_produto_preco', $data) or $this->exit_db_error();
