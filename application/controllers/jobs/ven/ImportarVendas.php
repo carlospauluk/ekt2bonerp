@@ -457,7 +457,12 @@ class ImportarVendas extends CI_Controller
                 ])->result_array();
 
                 if (!$qryGt || count($qryGt) !== 1) {
-                    throw new RuntimeException('Erro ao pesquisar grade.');
+                    // throw new RuntimeException('Erro ao pesquisar grade.');
+                    // seta como 'UN' só pra não parar a venda
+                    $qryGt = $this->dbcrosier->query('SELECT id FROM est_atributo WHERE uuid = ?', [
+                        'a43776ec-4b49-4cd8-8d4c-23f3182d4193'
+                    ])->result_array();
+
                 }
                 $itemVenda['gradeTamanho_atributoId'] = $qryGt[0]['id'];
 
