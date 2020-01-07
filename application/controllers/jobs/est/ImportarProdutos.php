@@ -582,10 +582,10 @@ class ImportarProdutos extends CI_Controller
 
         for ($i = 1; $i <= 12; $i++) {
             $qtde = (float)($ektProduto['QT' . str_pad($i, 2, '0', STR_PAD_LEFT)]);
-            if ($qtde) {
-                $this->saveProdutoSaldo($ektProduto, $produto, $i, $acumulado);
+            // if ($qtde) {
+                $this->saveProdutoSaldo($ektProduto, $produto, $i, $qtde);
                 $acumulado = 0.0; // já salvou, não precisa mais
-            }
+            // }
         }
         if ($acumulado) {
             $qtde = (float)($ektProduto['QT01']) ?: 0.0;
