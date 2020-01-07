@@ -1,6 +1,8 @@
 <?php
 
 
+use CIBases\Models\DAO\Base\Base_model;
+
 require_once('./application/libraries/file/LogWriter.php');
 require_once('./application/libraries/util/Datetime_utils.php');
 
@@ -15,11 +17,80 @@ require_once('./application/libraries/util/Datetime_utils.php');
 class ImportarProdutos extends CI_Controller
 {
 
-    /**
-     * @var LogWriter
-     */
+    public static $grades = [
+        1 => [
+            'uuid' => '750d27dd-7e1f-4fa2-91de-3433bafd4ac6', 'posicoes' => 7
+        ],
+        2 => [
+            'uuid' => 'f55b404d-0344-494b-bf88-95eb92ae5c14', 'posicoes' => 10
+        ],
+        3 => [
+            'uuid' => 'dfdd2b4a-040d-4748-9eaa-ed0f76f5aa65', 'posicoes' => 12
+        ],
+        4 => [
+            'uuid' => '1eebd976-48e8-4529-a711-395f932fa52a', 'posicoes' => 12
+        ],
+        5 => [
+            'uuid' => '5bfa9908-1c2e-4b36-b69c-8ecfab5e1bdd', 'posicoes' => 12
+        ],
+        6 => [
+            'uuid' => '54faa8f3-b0a9-4127-a4e8-0aa79749dff2', 'posicoes' => 12
+        ],
+        7 => [
+            'uuid' => 'd902289b-3c3f-4284-ae74-273a4be0b4ce', 'posicoes' => 12
+        ],
+        8 => [
+            'uuid' => '150f1ef0-e0a3-4ddf-9fce-e81427f24935', 'posicoes' => 12
+        ],
+        9 => [
+            'uuid' => 'ad2b24e5-c012-4a73-a693-0041836cd877', 'posicoes' => 11
+        ],
+        10 => [
+            'uuid' => '7b039a20-390f-425b-b72a-bc2d30bcbbc5', 'posicoes' => 1
+        ],
+        11 => [
+            'uuid' => '186bff19-0b26-47a6-9e77-81539277f230', 'posicoes' => 1
+        ],
+        12 => [
+            'uuid' => '946a4a1e-b392-4bff-9065-4bd48e78b8bd', 'posicoes' => 1
+        ],
+        13 => [
+            'uuid' => '8726ac02-1489-4a2d-b215-316c5ee307b0', 'posicoes' => 8
+        ],
+        14 => [
+            'uuid' => '8637de33-1e60-4773-a864-66353411d8a1', 'posicoes' => 10
+        ],
+        15 => [
+            'uuid' => '1aaa4ce9-87eb-41f8-a6cd-4abc383f49bb', 'posicoes' => 7
+        ],
+        16 => [
+            'uuid' => '512df5c9-6ac0-4fc1-a50c-073c9605bc96', 'posicoes' => 12
+        ],
+
+    ];
+
+    /** @var Base_model */
+    public $produtosaldo_model;
+
+    /** @var Produto_model */
+    public $produto_model;
+
+    /** @var Base_model */
+    public $preco_model;
+
+    /** @var Fornecedor_model */
+    public $fornecedor_model;
+
+    /** @var Ektproduto_model */
+    public $ektproduto_model;
+
+    /** @var Base_model */
+    public $produtoatributo_model;
+
+    /** @var LogWriter */
     private $logger;
 
+    /** @var DateTime */
     private $agora;
 
     /**
@@ -42,56 +113,26 @@ class ImportarProdutos extends CI_Controller
      */
     private $importandoMesCorrente;
 
+    /** @var int */
     private $inseridos;
 
+    /** @var int */
     private $atualizados;
 
-    /**
-     * @var CI_DB_mysqli_driver
-     */
+    /**  @var CI_DB_mysqli_driver */
     private $dbekt;
 
-    /**
-     * @var CI_DB_mysqli_driver
-     */
+    /** @var CI_DB_mysqli_driver */
     private $dbcrosier;
 
+    /** @var array */
     private $subgrupos;
 
+    /** @var array */
     private $unidades;
 
+    /** @var array */
     private $atributos;
-
-
-    /**
-     * @var \CIBases\Models\DAO\Base\Base_model
-     */
-    public $produtosaldo_model;
-
-    /**
-     * @var Produto_model
-     */
-    public $produto_model;
-
-    /**
-     * @var \CIBases\Models\DAO\Base\Base_model
-     */
-    public $preco_model;
-
-    /**
-     * @var Fornecedor_model
-     */
-    public $fornecedor_model;
-
-    /**
-     * @var Ektproduto_model
-     */
-    public $ektproduto_model;
-
-    /**
-     * @var \CIBases\Models\DAO\Base\Base_model
-     */
-    public $produtoatributo_model;
 
 
     /**
@@ -116,7 +157,7 @@ class ImportarProdutos extends CI_Controller
         $this->load->model('est/produto_model');
         $this->produto_model->setDb($this->dbcrosier);
 
-        $this->preco_model = new \CIBases\Models\DAO\Base\Base_model('est_produto_preco', 'crosier');
+        $this->preco_model = new Base_model('est_produto_preco', 'crosier');
         $this->preco_model->setDb($this->dbcrosier);
 
         $this->load->model('est/fornecedor_model');
@@ -125,11 +166,26 @@ class ImportarProdutos extends CI_Controller
         $this->load->model('ekt/ektproduto_model');
         $this->ektproduto_model->setDb($this->dbekt);
 
-        $this->produtosaldo_model = new \CIBases\Models\DAO\Base\Base_model('est_produto_saldo', 'crosier');
+        $this->produtosaldo_model = new Base_model('est_produto_saldo', 'crosier');
         $this->produtosaldo_model->setDb($this->dbcrosier);
 
-        $this->produtoatributo_model = new \CIBases\Models\DAO\Base\Base_model('est_produto_atributo', 'crosier');
+        $this->produtoatributo_model = new Base_model('est_produto_atributo', 'crosier');
         $this->produtoatributo_model->setDb($this->dbcrosier);
+
+        $this->buildGradesTamanhos();
+    }
+
+    /**
+     *
+     */
+    public function buildGradesTamanhos(): void
+    {
+        foreach (self::$grades as $k => $grade) {
+            $gts = $this->dbcrosier->query('SELECT id, label FROM est_atributo WHERE atributo_pai_uuid = ? ORDER BY ordem', [
+                $grade['uuid']
+            ])->result_array();
+            self::$grades[$k]['gts'] = $gts;
+        }
     }
 
     /**
@@ -382,7 +438,6 @@ class ImportarProdutos extends CI_Controller
         return $produto;
     }
 
-
     /**
      * @param $codigo
      * @return mixed
@@ -403,7 +458,6 @@ class ImportarProdutos extends CI_Controller
             return $this->subgrupos['0'];
         }
     }
-
 
     /**
      * Monta o est_produto.reduzido
@@ -451,6 +505,19 @@ class ImportarProdutos extends CI_Controller
         }
         // Se não achar, retorna o 999999 (ERRO DE IMPORTAÇÃO)
         return $this->unidades[$label] ? $this->unidades[$label] : $this->unidades['ERRO'];
+    }
+
+    /**
+     * @param string $uuid
+     * @return mixed
+     */
+    public function getAtributoByUUID(string $uuid)
+    {
+        if (!isset($this->atributos[$uuid])) {
+            $r = $this->dbcrosier->query('SELECT * FROM est_atributo WHERE uuid = ?', [$uuid])->result_array() or die('Atributo não encontrado para uuid = "' . $uuid . '"');
+            $this->atributos[$uuid] = $r[0]['id'];
+        }
+        return $this->atributos[$uuid];
     }
 
     /**
@@ -585,50 +652,37 @@ class ImportarProdutos extends CI_Controller
 
             $selec = $ektProduto['F' . $i] === 'S';
             if ($selec) {
-                $this->saveProdutoSaldo($ektProduto, $produto, $i, $qtde);
+
+                $atributoGtId = self::$grades[$ektProduto['GRADE']]['gts'][$i - 1]['id'];
+
+                $this->saveProdutoSaldo($produto['id'], $atributoGtId, $qtde);
                 $acumulado = 0.0; // já salvou, não precisa mais
             }
         }
         if ($acumulado) {
             $qtde = (float)$ektProduto['QT01'] ?: 0.0;
             $qtde += $acumulado;
-            $this->saveProdutoSaldo($ektProduto, $produto, 1, $qtde);
+            $atributoGtId = self::$grades[$ektProduto['GRADE']]['gts'][0];
+            $this->saveProdutoSaldo($produto['id'], $atributoGtId, $qtde);
         }
     }
 
     /**
      * Descobre a est_grade_tamanho e salva o est_produto_saldo.
-     *
-     * @param $ektProduto
-     * @param $produto
-     * @param $ordem
-     * @param $acumulado
+     * @param $produtoId
+     * @param $atributoGtId
+     * @param $qtde
      * @throws Exception
      */
-    private function saveProdutoSaldo($ektProduto, $produto, $ordem, $acumulado): void
+    private function saveProdutoSaldo($produtoId, $atributoGtId, $qtde): void
     {
-        $ordemStr = str_pad($ordem, 2, '0', STR_PAD_LEFT);
-
-        $qtde = (float)$ektProduto['QT' . $ordemStr];
-        $qtde += $acumulado;
-
-        $qryGt = $this->dbcrosier->query('SELECT id FROM est_atributo WHERE atributo_pai_uuid = ? AND ordem = ?', [
-            ImportarProdutos::$grades[$ektProduto['GRADE']]['uuid'],
-            $ordem
-        ])->result_array();
-
-        if (count($qryGt) !== 1) {
-            throw new RuntimeException('Erro ao pesquisar grade.');
-        }
-        $gt = $qryGt[0];
-
-        $produtoSaldo['produto_id'] = $produto['id'];
+        $produtoSaldo['produto_id'] = $produtoId;
         $produtoSaldo['qtde'] = $qtde;
 
         $produtoSaldoId = $this->produtosaldo_model->save($produtoSaldo) or $this->exit_db_error('Erro ao salvar na est_produto_saldo para o produto id [' . $produto['id'] . ']');
 
         $produtoSaldoAtributo['produto_saldo_id'] = $produtoSaldoId;
-        $produtoSaldoAtributo['atributo_id'] = $gt['id'];
+        $produtoSaldoAtributo['atributo_id'] = $atributoGtId;
 
         $this->dbcrosier->query('INSERT INTO est_produto_saldo_atributo(produto_saldo_id, atributo_id) VALUES(?,?)', $produtoSaldoAtributo);
     }
@@ -948,72 +1002,6 @@ class ImportarProdutos extends CI_Controller
         $this->logger->info('--------------------------------------------------------------');
         $this->logger->info('--------------------------------------------------------------');
     }
-
-    /**
-     * @param string $uuid
-     * @return mixed
-     */
-    public function getAtributoByUUID(string $uuid)
-    {
-        if (!isset($this->atributos[$uuid])) {
-            $r = $this->dbcrosier->query('SELECT * FROM est_atributo WHERE uuid = ?', [$uuid])->result_array() or die('Atributo não encontrado para uuid = "' . $uuid . '"');
-            $this->atributos[$uuid] = $r[0]['id'];
-        }
-        return $this->atributos[$uuid];
-    }
-
-
-    public static $grades = [
-        1 => [
-            'uuid' => '750d27dd-7e1f-4fa2-91de-3433bafd4ac6', 'posicoes' => 7
-        ],
-        2 => [
-            'uuid' => 'f55b404d-0344-494b-bf88-95eb92ae5c14', 'posicoes' => 10
-        ],
-        3 => [
-            'uuid' => 'dfdd2b4a-040d-4748-9eaa-ed0f76f5aa65', 'posicoes' => 12
-        ],
-        4 => [
-            'uuid' => '1eebd976-48e8-4529-a711-395f932fa52a', 'posicoes' => 12
-        ],
-        5 => [
-            'uuid' => '5bfa9908-1c2e-4b36-b69c-8ecfab5e1bdd', 'posicoes' => 12
-        ],
-        6 => [
-            'uuid' => '54faa8f3-b0a9-4127-a4e8-0aa79749dff2', 'posicoes' => 12
-        ],
-        7 => [
-            'uuid' => 'd902289b-3c3f-4284-ae74-273a4be0b4ce', 'posicoes' => 12
-        ],
-        8 => [
-            'uuid' => '150f1ef0-e0a3-4ddf-9fce-e81427f24935', 'posicoes' => 12
-        ],
-        9 => [
-            'uuid' => 'ad2b24e5-c012-4a73-a693-0041836cd877', 'posicoes' => 11
-        ],
-        10 => [
-            'uuid' => '7b039a20-390f-425b-b72a-bc2d30bcbbc5', 'posicoes' => 1
-        ],
-        11 => [
-            'uuid' => '186bff19-0b26-47a6-9e77-81539277f230', 'posicoes' => 1
-        ],
-        12 => [
-            'uuid' => '946a4a1e-b392-4bff-9065-4bd48e78b8bd', 'posicoes' => 1
-        ],
-        13 => [
-            'uuid' => '8726ac02-1489-4a2d-b215-316c5ee307b0', 'posicoes' => 8
-        ],
-        14 => [
-            'uuid' => '8637de33-1e60-4773-a864-66353411d8a1', 'posicoes' => 10
-        ],
-        15 => [
-            'uuid' => '1aaa4ce9-87eb-41f8-a6cd-4abc383f49bb', 'posicoes' => 7
-        ],
-        16 => [
-            'uuid' => '512df5c9-6ac0-4fc1-a50c-073c9605bc96', 'posicoes' => 12
-        ],
-
-    ];
 
 
 }
