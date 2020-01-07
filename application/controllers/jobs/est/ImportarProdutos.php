@@ -647,7 +647,7 @@ class ImportarProdutos extends CI_Controller
             $ektProduto['QT02'] = null;
         }
 
-        for ($i = 1; $i <= 12; $i++) {
+        for ($i = 1; $i <= $qtdeTamanhos; $i++) {
             $qtde = (float)$ektProduto['QT' . str_pad($i, 2, '0', STR_PAD_LEFT)];
 
             $selec = $ektProduto['F' . $i] === 'S';
