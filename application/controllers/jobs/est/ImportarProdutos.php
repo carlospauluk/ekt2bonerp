@@ -191,7 +191,7 @@ class ImportarProdutos extends CI_Controller
         $this->logger->info(PHP_EOL);
         $this->logger->info('----------------------------------');
         $this->logger->info('Tempo total: ' . $execution_time . 's');
-        $this->logger->sendMail();
+        // $this->logger->sendMail();
         $this->logger->closeLog();
     }
 
@@ -581,14 +581,16 @@ class ImportarProdutos extends CI_Controller
         }
 
         for ($i = 1; $i <= 12; $i++) {
-            $qtde = (float)($ektProduto['QT' . str_pad($i, 2, '0', STR_PAD_LEFT)]);
-            // if ($qtde) {
+            $qtde = (float)$ektProduto['QT' . str_pad($i, 2, '0', STR_PAD_LEFT)];
+
+            $selec = $ektProduto['F' . $i] === 'S';
+            if ($selec) {
                 $this->saveProdutoSaldo($ektProduto, $produto, $i, $qtde);
                 $acumulado = 0.0; // já salvou, não precisa mais
-            // }
+            }
         }
         if ($acumulado) {
-            $qtde = (float)($ektProduto['QT01']) ?: 0.0;
+            $qtde = (float)$ektProduto['QT01'] ?: 0.0;
             $qtde += $acumulado;
             $this->saveProdutoSaldo($ektProduto, $produto, 1, $qtde);
         }
