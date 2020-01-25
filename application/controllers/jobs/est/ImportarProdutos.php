@@ -284,7 +284,7 @@ class ImportarProdutos extends CI_Controller
         $this->dbcrosier->trans_start();
 
         $l = $this->ektproduto_model->findByMesano($this->mesano);
-        // $l = $this->dbekt->query("SELECT * FROM ekt_produto WHERE reduzido = 1507 AND mesano = ?", array($this->mesano))->result_array();
+        // $l = $this->dbekt->query("SELECT * FROM ekt_produto WHERE reduzido = 5763 AND mesano = ?", array($this->mesano))->result_array();
 
         $total = count($l);
         $this->logger->info(' >>>>>>>>>>>>>>>>>>>> ' . $total . ' produto(s) encontrado(s).');
@@ -346,7 +346,6 @@ class ImportarProdutos extends CI_Controller
                     $qtdeTotal_produto = $this->getQtdeTotalProduto($mesmoReduzido);
                     if ((float)$qtdeTotal_ektProduto !== (float)$qtdeTotal_produto) {
                         $this->logger->info('Qtde diferem para produtoId=[' . $mesmoReduzido['id'] . '] Reduzido:[' . $ektProduto['REDUZIDO'] . ']');
-                        return;
                     }
 
                     $this->insereNaReduzidoEktMesano($mesmoReduzido);
