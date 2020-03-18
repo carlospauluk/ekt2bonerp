@@ -85,12 +85,6 @@ class ImportarVendas extends CI_Controller
     public $funcionario_model;
 
 
-    /**
-     * @var \CIBases\Models\DAO\Base\Base_model
-     */
-    public $produtoatributo_model;
-
-
     public function __construct()
     {
         parent::__construct();
@@ -312,13 +306,13 @@ class ImportarVendas extends CI_Controller
         $venda = null;
         if ($q == 1) {
             $venda = $vendas[0];
-
+			$venda_jsonData = json_decode($venda['json_data'], true);
             $dt_venda_mesano = DateTime::createFromFormat('Y-m-d H:i:s', $venda['dt_venda'])->format('Ym');
             if ($dt_venda_mesano != $this->mesano) {
                 $this->logger->info("venda.dt_venda difere do mesano da importação.");
                 return;
             }
-            if ($venda['mesano'] != $dt_venda_mesano) {
+            if ($venda_jsonData['mesano'] != $dt_venda_mesano) {
                 $this->logger->info("venda.mesano incompatível com venda.dt_venda.");
                 return;
             }
@@ -382,6 +376,10 @@ class ImportarVendas extends CI_Controller
         $venda_itens = [];
         foreach ($ektItens as $ektItem) {
 
+			$vendaItem_jsonData = [];
+
+
+
             $this->logger->debug("SALVANDO ITEM: " . $ektItem['PRODUTO'] . " - [" . $ektItem['DESCRICAO'] . "]");
 
             $ektProduto = null;
@@ -432,49 +430,30 @@ class ImportarVendas extends CI_Controller
             // Para NCs
             if ($ektItem['PRODUTO'] == 88888) {
                 $itemVenda['obs'] .= PHP_EOL . "NC 88888";
-
-
-                $qryGt = $this->dbcrosier->query('SELECT id FROM est_atributo WHERE uuid = ?', [
-                    'a43776ec-4b49-4cd8-8d4c-23f3182d4193'
-                ])->result_array();
-
-                if (!$qryGt || count($qryGt) !== 1) {
-                    throw new RuntimeException('Erro ao pesquisar grade.');
-                }
-                $itemVenda['gradeTamanho_atributoId'] = $qryGt[0]['id'];
-
             } else {
-
                 $produto = $this->produto_model->findByReduzidoEktAndMesano($ektItem['PRODUTO'], $this->mesano);
                 if (!$produto) {
                     $this->logger->info("est_produto não encontrado para REDUZIDO = [" . $ektItem['PRODUTO'] . "] em mesano = [" . $this->mesano . "]");
                     return;
                 }
                 $itemVenda['produto_id'] = $produto['id'];
-
-                $qryGt = $this->dbcrosier->query('SELECT id FROM est_atributo WHERE atributo_pai_uuid = ? AND label = ?', [
-                    ImportarVendas::$grades[$ektProduto['GRADE']]['uuid'],
-                    $ektItem['TAMANHO']
-                ])->result_array();
-
-                if (!$qryGt || count($qryGt) !== 1) {
-                    // throw new RuntimeException('Erro ao pesquisar grade.');
-                    // seta como 'UN' só pra não parar a venda
-                    $qryGt = $this->dbcrosier->query('SELECT id FROM est_atributo WHERE uuid = ?', [
-                        'a43776ec-4b49-4cd8-8d4c-23f3182d4193'
-                    ])->result_array();
-
-                }
-                $itemVenda['gradeTamanho_atributoId'] = $qryGt[0]['id'];
-
-                $params = [
-                    $produto['id'],
-                    $itemVenda['preco_venda'],
-                    $itemVenda['preco_venda']
-                ];
-
+                $produto_jsonData = json_decode($produto['json_data'], true);
+                $vendaItem_jsonData['ncm'] = $produto['ncm'];
+                $vendaItem_jsonData['produto']['depto_id'] = $produto['depto_id'];
+                $vendaItem_jsonData['produto']['depto_codigo'] = $produto_jsonData['depto_codigo'];
+                $vendaItem_jsonData['produto']['depto_nome'] = $produto_jsonData['depto_nome'];
+				$vendaItem_jsonData['produto']['grupo_id'] = $produto['grupo_id'];
+				$vendaItem_jsonData['produto']['grupo_codigo'] = $produto_jsonData['grupo_codigo'];
+				$vendaItem_jsonData['produto']['grupo_nome'] = $produto_jsonData['grupo_nome'];
+				$vendaItem_jsonData['produto']['subgrupo_id'] = $produto['subgrupo_id'];
+				$vendaItem_jsonData['produto']['subgrupo_codigo'] = $produto_jsonData['subgrupo_codigo'];
+				$vendaItem_jsonData['produto']['subgrupo_nome'] = $produto_jsonData['subgrupo_nome'];
+                $vendaItem_jsonData['produto']['reduzido'] = $produto_jsonData['reduzido'];
+                $vendaItem_jsonData['produto']['descricao'] = $produto['nome'];
                 $itemVenda['ncm'] = $produto['ncm'];
             }
+			$vendaItem_jsonData['tamanho'] = trim($ektItem['TAMANHO']);
+            $itemVenda['json_data'] = json_encode($vendaItem_jsonData);
             $subTotalVenda += $valorTotal;
 
             $venda_itens[] = $itemVenda;
@@ -511,10 +490,7 @@ class ImportarVendas extends CI_Controller
 
         foreach ($venda_itens as $venda_item) {
             $venda_item['venda_id'] = $venda_id;
-            $gradeTamanho_atributoId = $venda_item['gradeTamanho_atributoId'];
-            unset($venda_item['gradeTamanho_atributoId']);
             $vendaItemId = $this->vendaitem_model->save($venda_item);
-            $this->dbcrosier->query('INSERT INTO ven_venda_item_atributo(venda_item_id, atributo_id) VALUES(?,?)', [$vendaItemId, $gradeTamanho_atributoId]);
         }
 
         if (!$venda['deletado']) {
