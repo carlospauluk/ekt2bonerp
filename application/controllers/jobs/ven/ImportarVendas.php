@@ -542,7 +542,7 @@ class ImportarVendas extends CI_Controller
         $i = 0;
         foreach ($result as $r) {
             try {
-                $query = $this->dbcrosier->query("SELECT * FROM ven_venda WHERE pv = ? AND mesano = ?", array(
+                $query = $this->dbcrosier->query('SELECT * FROM ven_venda WHERE pv = ? AND json_data."$->>mesano" = ?', array(
                     $r['NUMERO'],
                     $r['mesano']
                 )) or $this->exit_db_error();
@@ -650,7 +650,7 @@ class ImportarVendas extends CI_Controller
     {
         $this->logger->info("Marcando vendas deletadas para o mês/ano: [" . $this->mesano . "]");
 
-        $vendas = $this->dbcrosier->query("SELECT * FROM ven_venda WHERE deletado IS FALSE AND mesano = ?", array(
+        $vendas = $this->dbcrosier->query('SELECT * FROM ven_venda WHERE deletado IS FALSE AND json_data->>"$.mesano" = ?', array(
             $this->mesano
         ))->result_array();
 
