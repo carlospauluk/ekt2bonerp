@@ -357,8 +357,9 @@ class ImportarVendas extends CI_Controller
         }
 
         $venda['status'] = 'FINALIZADA';
-        $venda['tipo'] = 'PREVENDA';
-        $venda['mesano'] = $this->mesano;
+        $jsonData['tipo'] = 'PREVENDA';
+        $jsonData['mesano'] = $this->mesano;
+        $venda['json_data'] = json_encode($jsonData);
         $venda['pv'] = $ektVenda['NUMERO'];
         $venda['dt_venda'] = $ektVenda['EMISSAO'];
 
