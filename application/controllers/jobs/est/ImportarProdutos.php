@@ -162,9 +162,6 @@ class ImportarProdutos extends CI_Controller
 			$this->importarProdutos();
 			$this->corrigirCampoAtual();
 		}
-		if ($acao === 'PRECOS') {
-			$this->corrigirPrecos();
-		}
 
 		$time_end = microtime(true);
 		$execution_time = ($time_end - $time_start);
@@ -420,28 +417,6 @@ class ImportarProdutos extends CI_Controller
 		return $reduzido;
 
 	}
-
-	/**
-	 * @param $label
-	 * @return mixed
-	 */
-	private function findUnidadeByLabel($label)
-	{
-		if (!$this->unidades) {
-			$this->unidades = array();
-			$sql = 'SELECT id, label FROM est_unidade_produto';
-			$r = $this->dbcrosier->query($sql)->result_array();
-			foreach ($r as $unidade) {
-				$this->unidades[$unidade['label']] = $unidade['id'];
-			}
-		}
-		if (!$label === null or strpos($label, 'PC') >= 0) {
-			$label = 'UN';
-		}
-		// Se não achar, retorna o 999999 (ERRO DE IMPORTAÇÃO)
-		return $this->unidades[$label] ? $this->unidades[$label] : $this->unidades['ERRO'];
-	}
-
 
 	/**
 	 * Salva o est_produto_preco.
