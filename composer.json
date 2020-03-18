@@ -4,7 +4,8 @@
   "type": "project",
   "require": {
     "php": ">=7.1.0",
-    "ext-bcmath": "*"
+    "ext-bcmath": "*",
+    "ext-json": "*"
   },
   "suggest": {
     "paragonie/random_compat": "Provides better randomness in PHP 5.x"

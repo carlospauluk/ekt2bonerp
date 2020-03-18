@@ -20,7 +20,7 @@ class Produto_model extends CIBases\Models\DAO\Base\Base_model
      */
     public function findByReduzidoEkt($reduzidoEkt)
     {
-        $sql = "SELECT * FROM est_produto WHERE codigo_from = ? ORDER BY inserted";
+        $sql = 'SELECT * FROM est_produto WHERE json_data->>"$.reduzido" = ? ORDER BY inserted';
         $params = [
             $reduzidoEkt
         ];
@@ -53,7 +53,7 @@ class Produto_model extends CIBases\Models\DAO\Base\Base_model
         } else if (count($r) == 0) {
             return null;
         } else {
-            throw new \Exception("Mais de um produto encontrado na est_produto_reduzidoektmesano para codigo_from (reduzido ekt) = [" . $reduzidoEkt . "] e mesano = [" . $mesano . "]");
+            throw new \Exception("Mais de um produto encontrado na est_produto_reduzidoektmesano para reduzido ekt = [" . $reduzidoEkt . "] e mesano = [" . $mesano . "]");
         }
     }
 

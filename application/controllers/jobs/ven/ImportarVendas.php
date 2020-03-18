@@ -357,7 +357,7 @@ class ImportarVendas extends CI_Controller
         }
 
         $venda['status'] = 'FINALIZADA';
-        $venda['tipo_venda_id'] = 1;
+        $venda['tipo'] = 'PREVENDA';
         $venda['mesano'] = $this->mesano;
         $venda['pv'] = $ektVenda['NUMERO'];
         $venda['dt_venda'] = $ektVenda['EMISSAO'];
@@ -472,14 +472,6 @@ class ImportarVendas extends CI_Controller
                     $itemVenda['preco_venda']
                 ];
 
-                $precos = $this->dbcrosier->query("SELECT * FROM est_produto_preco WHERE produto_id = ? AND (preco_prazo = ? OR preco_promo = ?)", $params)->result_array();
-
-                if (count($precos) > 0) {
-                    $itemVenda['alteracao_preco'] = false;
-                } else {
-                    $itemVenda['alteracao_preco'] = true;
-                }
-
                 $itemVenda['ncm'] = $produto['ncm'];
             }
             $subTotalVenda += $valorTotal;
@@ -489,7 +481,7 @@ class ImportarVendas extends CI_Controller
 
         $venda['desconto_plano'] = $ektVenda['DESC_ACRES'] ? $ektVenda['DESC_ACRES'] : 0.0;
         $venda['desconto_especial'] = $ektVenda['DESC_ESPECIAL'] ? $ektVenda['DESC_ESPECIAL'] : 0.0;
-        $venda['historicoDesconto'] = $ektVenda['HIST_DESC'];
+        $venda['historico_desconto'] = $ektVenda['HIST_DESC'];
 
         if (bccomp($subTotalVenda, $ektVenda['SUB_TOTAL']) != 0) {
             $msg = "********** ATENÇÃO: erro em SUB TOTAL VENDA: " . $ektVenda['SUB_TOTAL'] . ". TOTAL SOMADO: " . $subTotalVenda;
