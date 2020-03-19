@@ -187,9 +187,9 @@ class ImportarVendas extends CI_Controller
 
 		$this->importarVendedores();
 
-		$l = $this->dbekt->query("SELECT * FROM ekt_venda WHERE mesano = ?", [$this->mesano])->result_array();
+		$l = $this->dbekt->query("SELECT * FROM ekt_venda WHERE mesano = ? LIMIT 1", [$this->mesano])->result_array();
 
-		// $l = $this->dbekt->query("SELECT * FROM ekt_produto WHERE reduzido = 4521 AND mesano = ?", array($this->mesano))->result_array();
+
 
 		$total = count($l);
 		$this->logger->info(" >>>>>>>>>>>>>>>>>>>> " . $total . " venda(s) encontrada(s).");
@@ -679,55 +679,4 @@ class ImportarVendas extends CI_Controller
 	}
 
 
-	public static $grades = [
-		1 => [
-			'uuid' => '750d27dd-7e1f-4fa2-91de-3433bafd4ac6', 'posicoes' => 7
-		],
-		2 => [
-			'uuid' => 'f55b404d-0344-494b-bf88-95eb92ae5c14', 'posicoes' => 10
-		],
-		3 => [
-			'uuid' => 'dfdd2b4a-040d-4748-9eaa-ed0f76f5aa65', 'posicoes' => 12
-		],
-		4 => [
-			'uuid' => '1eebd976-48e8-4529-a711-395f932fa52a', 'posicoes' => 12
-		],
-		5 => [
-			'uuid' => '5bfa9908-1c2e-4b36-b69c-8ecfab5e1bdd', 'posicoes' => 12
-		],
-		6 => [
-			'uuid' => '54faa8f3-b0a9-4127-a4e8-0aa79749dff2', 'posicoes' => 12
-		],
-		7 => [
-			'uuid' => 'd902289b-3c3f-4284-ae74-273a4be0b4ce', 'posicoes' => 12
-		],
-		8 => [
-			'uuid' => '150f1ef0-e0a3-4ddf-9fce-e81427f24935', 'posicoes' => 12
-		],
-		9 => [
-			'uuid' => 'ad2b24e5-c012-4a73-a693-0041836cd877', 'posicoes' => 11
-		],
-		10 => [
-			'uuid' => '7b039a20-390f-425b-b72a-bc2d30bcbbc5', 'posicoes' => 1
-		],
-		11 => [
-			'uuid' => '186bff19-0b26-47a6-9e77-81539277f230', 'posicoes' => 1
-		],
-		12 => [
-			'uuid' => '946a4a1e-b392-4bff-9065-4bd48e78b8bd', 'posicoes' => 1
-		],
-		13 => [
-			'uuid' => '8726ac02-1489-4a2d-b215-316c5ee307b0', 'posicoes' => 8
-		],
-		14 => [
-			'uuid' => '8637de33-1e60-4773-a864-66353411d8a1', 'posicoes' => 10
-		],
-		15 => [
-			'uuid' => '1aaa4ce9-87eb-41f8-a6cd-4abc383f49bb', 'posicoes' => 7
-		],
-		16 => [
-			'uuid' => '512df5c9-6ac0-4fc1-a50c-073c9605bc96', 'posicoes' => 12
-		],
-
-	];
 }
