@@ -187,7 +187,7 @@ class ImportarVendas extends CI_Controller
 
 		$this->importarVendedores();
 
-		$l = $this->dbekt->query("SELECT * FROM ekt_venda WHERE mesano = ? LIMIT 1", [$this->mesano])->result_array();
+		$l = $this->dbekt->query("SELECT * FROM ekt_venda WHERE mesano = ?", [$this->mesano])->result_array();
 
 
 
