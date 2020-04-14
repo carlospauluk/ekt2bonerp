@@ -344,7 +344,7 @@ class ImportarVendas extends CI_Controller
 	 */
 	private function salvarVenda($ektVenda, $venda = null)
 	{
-		if ($venda['deletado'] === true or $ektVenda['COND_PAG'] == '0.99') {
+		if ((isset($venda['deletado']) && $venda['deletado'] === true) or (isset($ektVenda['COND_PAG']) && $ektVenda['COND_PAG'] == '0.99')) {
 			$venda['deletado'] = true;
 		} else {
 			$venda['deletado'] = false;
