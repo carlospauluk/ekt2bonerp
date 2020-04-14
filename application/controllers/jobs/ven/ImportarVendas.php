@@ -363,7 +363,7 @@ class ImportarVendas extends CI_Controller
 			$this->logger->info('Vendedor não encontrado, portanto pulando venda... ' . $ektVenda['NUMERO'] . ' de ' . $this->mesano);
 			return;
 		}
-		$jsonData['vendedor_nome'] = $ektVenda['VENDEDOR'];
+		$jsonData['vendedor_nome'] = $this->vendedores_nomes[$ektVenda['VENDEDOR']];
 
 		$params = [
 			$this->mesano,
