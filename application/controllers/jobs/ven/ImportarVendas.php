@@ -353,7 +353,6 @@ class ImportarVendas extends CI_Controller
 		$venda['status'] = 'FINALIZADA';
 		$jsonData['tipo'] = 'PREVENDA';
 		$jsonData['mesano'] = $this->mesano;
-		$venda['json_data'] = json_encode($jsonData);
 		$venda['pv'] = $ektVenda['NUMERO'];
 		$venda['dt_venda'] = $ektVenda['EMISSAO'];
 
@@ -505,6 +504,8 @@ class ImportarVendas extends CI_Controller
 
 		// $venda['valor_total'] = $totalVendaCalculado;
 		$venda['valor_total'] = $totalVendaEKT;
+
+		$venda['json_data'] = json_encode($jsonData);
 
 		$venda_id = $this->venda_model->save($venda);
 
