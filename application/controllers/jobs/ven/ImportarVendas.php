@@ -294,7 +294,7 @@ class ImportarVendas extends CI_Controller
 
 		$this->logger->debug(PHP_EOL . ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Importando venda PV = [" . $ektVenda['NUMERO'] . "] em =[" . $ektVenda['EMISSAO'] . "]");
 
-		$vendas = $this->dbcrosier->query("SELECT * FROM ven_venda WHERE pv = ? AND dt_venda = ?", $params)->result_array();
+		$vendas = $this->dbcrosier->query("SELECT * FROM ven_venda WHERE pv = ? AND date(dt_venda) = ?", $params)->result_array();
 		$q = count($vendas);
 
 		if ($q > 1) {
