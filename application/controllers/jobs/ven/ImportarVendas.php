@@ -416,7 +416,7 @@ class ImportarVendas extends CI_Controller
 
 			$valorTotal = round($itemVenda['qtde'] * $itemVenda['preco_venda'], 2);
 
-			if (bccomp($valorTotal, $ektItem['VLR_TOTAL']) != 0) {
+			if (bccomp(''.$valorTotal, ''.$ektItem['VLR_TOTAL']) != 0) {
 				$msg = "********** ATENÇÃO: erro em total de produto importado. Total Produto EKT: " . $valorTotal . ". Total Calculado: " . $ektItem['VLR_TOTAL'];
 				$this->logger->debug($msg);
 				$itemVenda['obs'] .= PHP_EOL . $msg;
@@ -482,7 +482,7 @@ class ImportarVendas extends CI_Controller
 		$venda['desconto_especial'] = $ektVenda['DESC_ESPECIAL'] ? $ektVenda['DESC_ESPECIAL'] : 0.0;
 		$venda['historico_desconto'] = $ektVenda['HIST_DESC'];
 
-		if (bccomp($subTotalVenda, $ektVenda['SUB_TOTAL']) != 0) {
+		if (bccomp(''.$subTotalVenda, ''.$ektVenda['SUB_TOTAL']) != 0) {
 			$msg = "********** ATENÇÃO: erro em SUB TOTAL VENDA: " . $ektVenda['SUB_TOTAL'] . ". TOTAL SOMADO: " . $subTotalVenda;
 			$this->logger->debug($msg);
 			$venda['obs'] .= PHP_EOL . $msg;
@@ -496,7 +496,7 @@ class ImportarVendas extends CI_Controller
 
 		$venda['obs'] = "";
 
-		if (bccomp($totalVendaCalculado, $totalVendaEKT) != 0) {
+		if (bccomp(''.$totalVendaCalculado, ''.$totalVendaEKT) != 0) {
 			$msg = "********** ATENÇÃO: erro em TOTAL VENDA EKT: [" . $totalVendaEKT . "] TOTAL SOMA: [" . $totalVendaCalculado . "]";
 			$this->logger->debug($msg);
 			$venda['obs'] .= PHP_EOL . $msg;
