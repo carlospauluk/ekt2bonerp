@@ -478,8 +478,8 @@ class ImportarVendas extends CI_Controller
 			$venda_itens[] = $itemVenda;
 		}
 
-		$venda['desconto_plano'] = $ektVenda['DESC_ACRES'] ? $ektVenda['DESC_ACRES'] : 0.0;
-		$venda['desconto_especial'] = $ektVenda['DESC_ESPECIAL'] ? $ektVenda['DESC_ESPECIAL'] : 0.0;
+		$venda['desconto'] = $ektVenda['DESC_ACRES'] ? $ektVenda['DESC_ACRES'] : 0.0;
+
 		$venda['historico_desconto'] = $ektVenda['HIST_DESC'];
 
 		if (bcsub(''.$subTotalVenda, ''.$ektVenda['SUB_TOTAL'], 2) != 0.00) {
@@ -490,7 +490,7 @@ class ImportarVendas extends CI_Controller
 
 		$venda['sub_total'] = $subTotalVenda;
 
-		$totalVendaCalculado = $subTotalVenda + $venda['desconto_plano'] + $venda['desconto_especial'];
+		$totalVendaCalculado = $subTotalVenda + $venda['desconto'] + $venda['desconto_especial'];
 
 		$totalVendaEKT = (float)$ektVenda['TOTAL'];
 
@@ -506,6 +506,7 @@ class ImportarVendas extends CI_Controller
 		$venda['valor_total'] = $totalVendaEKT;
 
 		$venda['json_data'] = json_encode($jsonData);
+		$venda['json_data']['desconto_especial'] = $ektVenda['DESC_ESPECIAL'] ? $ektVenda['DESC_ESPECIAL'] : 0.0;
 
 		$venda_id = $this->venda_model->save($venda);
 
