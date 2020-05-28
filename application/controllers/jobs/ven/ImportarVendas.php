@@ -488,7 +488,7 @@ class ImportarVendas extends CI_Controller
 			$venda['obs'] .= PHP_EOL . $msg;
 		}
 
-		$venda['sub_total'] = $subTotalVenda;
+		$venda['subtotal'] = $subTotalVenda;
 
 		$totalVendaCalculado = $subTotalVenda + $venda['desconto'] + $venda['desconto_especial'];
 
