@@ -489,8 +489,9 @@ class ImportarVendas extends CI_Controller
 		}
 
 		$venda['subtotal'] = $subTotalVenda;
+		$jsonData['desconto_especial'] = $ektVenda['DESC_ESPECIAL'] ? $ektVenda['DESC_ESPECIAL'] : 0.0;
 
-		$totalVendaCalculado = $subTotalVenda + $venda['desconto'] + $venda['desconto_especial'];
+		$totalVendaCalculado = $subTotalVenda + $venda['desconto'] + $jsonData['desconto_especial'];
 
 		$totalVendaEKT = (float)$ektVenda['TOTAL'];
 
@@ -505,8 +506,8 @@ class ImportarVendas extends CI_Controller
 		// $venda['valor_total'] = $totalVendaCalculado;
 		$venda['valor_total'] = $totalVendaEKT;
 
+
 		$venda['json_data'] = json_encode($jsonData);
-		$venda['json_data']['desconto_especial'] = $ektVenda['DESC_ESPECIAL'] ? $ektVenda['DESC_ESPECIAL'] : 0.0;
 
 		$venda_id = $this->venda_model->save($venda);
 
