@@ -190,7 +190,6 @@ class ImportarVendas extends CI_Controller
 		$l = $this->dbekt->query("SELECT * FROM ekt_venda WHERE mesano = ?", [$this->mesano])->result_array();
 
 
-
 		$total = count($l);
 		$this->logger->info(" >>>>>>>>>>>>>>>>>>>> " . $total . " venda(s) encontrada(s).");
 
@@ -298,9 +297,10 @@ class ImportarVendas extends CI_Controller
 		$q = count($vendas);
 
 		if ($q > 1) {
+			$this->dbcrosier->delete('ven_venda', ['pv' => $ektVenda['NUMERO'], 'date(dt_venda)' => $ektVenda['EMISSAO']]);
 			$this->logger->debug("Mais de uma venda encontrada para os dados");
 			print_r($params);
-			exit();
+			// exit();
 		}
 
 		$venda = null;
@@ -416,7 +416,7 @@ class ImportarVendas extends CI_Controller
 
 			$valorTotal = round($itemVenda['qtde'] * $itemVenda['preco_venda'], 2);
 
-			if (bcsub(''.$valorTotal, ''.$ektItem['VLR_TOTAL'], 2) != 0.00) {
+			if (bcsub('' . $valorTotal, '' . $ektItem['VLR_TOTAL'], 2) != 0.00) {
 				$msg = "********** ATENÇÃO: erro em total de produto importado. Total Produto EKT: " . $valorTotal . ". Total Calculado: " . $ektItem['VLR_TOTAL'];
 				$this->logger->debug($msg);
 				$itemVenda['obs'] .= PHP_EOL . $msg;
@@ -482,7 +482,7 @@ class ImportarVendas extends CI_Controller
 
 		$venda['historico_desconto'] = $ektVenda['HIST_DESC'];
 
-		if (bcsub(''.$subTotalVenda, ''.$ektVenda['SUB_TOTAL'], 2) != 0.00) {
+		if (bcsub('' . $subTotalVenda, '' . $ektVenda['SUB_TOTAL'], 2) != 0.00) {
 			$msg = "********** ATENÇÃO: erro em SUB TOTAL VENDA: " . $ektVenda['SUB_TOTAL'] . ". TOTAL SOMADO: " . $subTotalVenda;
 			$this->logger->debug($msg);
 			$venda['obs'] .= PHP_EOL . $msg;
@@ -497,7 +497,7 @@ class ImportarVendas extends CI_Controller
 
 		$venda['obs'] = "";
 
-		if (bcsub(''.$totalVendaCalculado, ''.$totalVendaEKT, 2) != 0.00) {
+		if (bcsub('' . $totalVendaCalculado, '' . $totalVendaEKT, 2) != 0.00) {
 			$msg = "********** ATENÇÃO: erro em TOTAL VENDA EKT: [" . $totalVendaEKT . "] TOTAL SOMA: [" . $totalVendaCalculado . "]";
 			$this->logger->debug($msg);
 			$venda['obs'] .= PHP_EOL . $msg;
