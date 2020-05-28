@@ -115,7 +115,7 @@ class ImportarVendas extends CI_Controller
 		$this->pessoa_model = new \CIBases\Models\DAO\Base\Base_model('bse_pessoa', 'crosier');
 		$this->pessoa_model->setDb($this->dbcrosier);
 
-		$this->funcionario_model = new \CIBases\Models\DAO\Base\Base_model('rh_funcionario', 'crosier');
+		$this->funcionario_model = new \CIBases\Models\DAO\Base\Base_model('rh_colaborador', 'crosier');
 		$this->funcionario_model->setDb($this->dbcrosier);
 	}
 
@@ -257,7 +257,7 @@ class ImportarVendas extends CI_Controller
 			$codigo = trim($ektVendedor['CODIGO']);
 			if ($codigo == 99)
 				continue;
-			$vendedor = $this->dbcrosier->query("SELECT 1 FROM rh_funcionario WHERE nome_ekt = ? AND codigo = ?", array(
+			$vendedor = $this->dbcrosier->query("SELECT 1 FROM rh_colaborador WHERE nome_ekt = ? AND codigo = ?", array(
 				$nomeEkt,
 				$codigo
 			))->result_array();
@@ -620,7 +620,7 @@ class ImportarVendas extends CI_Controller
 
 		if (!$this->vendedores) {
 
-			$r = $this->dbcrosier->query("SELECT id, codigo, nome_ekt FROM rh_funcionario")->result_array();
+			$r = $this->dbcrosier->query("SELECT id, codigo, nome_ekt FROM rh_colaborador")->result_array();
 			if (count($r) < 1) {
 				$this->logger->info("Nenhum vendedor encontrado na base.");
 				return null;
