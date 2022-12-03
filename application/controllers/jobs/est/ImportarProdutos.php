@@ -314,7 +314,15 @@ class ImportarProdutos extends CI_Controller
 
 		$fornecedor_id = $this->fornecedor_model->findByCodigoEkt($ektProduto['FORNEC'], $this->mesano);
 		if (!$fornecedor_id) {
-			throw new RuntimeException('Fornecedor não encontrado: [' . $ektProduto['FORNEC'] . '] no mesano [' . $this->mesano . ']');
+			$fornecedor_id = 248;
+			/**
+			+-----+--------+------------------------+
+			| id  | codigo | nome                   |
+			+-----+--------+------------------------+
+			| 248 |     99 |  << NÃO INFORMADO >>   |
+			+-----+--------+------------------------+
+			 */
+			// throw new RuntimeException('Fornecedor não encontrado: [' . $ektProduto['FORNEC'] . '] no mesano [' . $this->mesano . ']');
 		}
 		$produto['fornecedor_id'] = $fornecedor_id;
 
