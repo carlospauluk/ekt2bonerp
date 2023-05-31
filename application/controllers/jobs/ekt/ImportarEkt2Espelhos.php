@@ -142,7 +142,7 @@ class ImportarEkt2Espelhos extends CI_Controller
         $time_end = microtime(true);
         $execution_time = ($time_end - $time_start);
         $this->logger->info(PHP_EOL . PHP_EOL . "---------------------------------- Total Execution Time: " . $execution_time . "s");
-        $this->logger->sendMail();
+        // $this->logger->sendMail();
         $this->logger->closeLog();
     }
 
