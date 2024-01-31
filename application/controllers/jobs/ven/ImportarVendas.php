@@ -636,8 +636,9 @@ class ImportarVendas extends CI_Controller
 		$nome = $this->vendedores_nomes[$codigo];
 
 		if (!$this->vendedores[$codigo][$nome]) {
-			$this->logger->info("Vendedor não encontrado para: [" . $codigo . "]");
-			return null;
+			$this->vendedores[$codigo][$nome] = '';
+			// $this->logger->info("Vendedor não encontrado para: [" . $codigo . "]");
+			// return null;
 		}
 		return $this->vendedores[$codigo][$nome];
 	}
